@@ -21,7 +21,6 @@ def load_bls_industries():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_wikipedia_urls(industry_query):
-    """Return URLs and full text for the 5 most relevant Wikipedia pages."""
     search_results = wikipedia.search(industry_query, results=5)
     wiki_api = wikipediaapi.Wikipedia(user_agent="MarketResearchAssistant 101", language="en")
     urls, all_texts = [], []
@@ -33,7 +32,6 @@ def get_wikipedia_urls(industry_query):
     return urls, all_texts
 
 def extract_text_from_response(response):
-    """Safely extract plain text from a Gemini response object."""
     text_output = ""
     if response and response.candidates:
         for part in response.candidates[0].content.parts:
@@ -42,7 +40,6 @@ def extract_text_from_response(response):
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
 def is_valid_industry(client, user_input):
-    """Strictly validate if the input is a real economic sector."""
     text = user_input.strip()
     if len(text) < 3 or text.isdigit():
         return False
@@ -50,7 +47,7 @@ def is_valid_industry(client, user_input):
         return False
     
     try:
-        validation_prompt = f"Categorize the term '{text}' into one of two tags: [INDUSTRY] for real economic sectors Is this a recognized economic industry or market sector (e.g., Renewable Energy, SaaS, Automotive)?, or [INVALID] for fictional characters, specific people, cities, or random objects. Return ONLY the tag."
+        validation_prompt = f"Categorize the term '{text}' into one of two tags: [INDUSTRY] for real economic sectors, or [INVALID] for fictional characters, specific people, cities, or random objects. Return ONLY the tag."
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=validation_prompt,
@@ -65,11 +62,10 @@ def word_count(text):
     return len(re.findall(r"\b\w+\b", text))
 
 def enforce_word_limits(text, min_words=450, max_words=490):
-    """Ensure text stays under the 500-word limit by truncating at the last sentence."""
+    """Checks the floor and ceiling of the word count."""
     matches = list(re.finditer(r"\b\w+\b", text))
     count = len(matches)
     
-   
     if count > max_words:
         cutoff_pos = matches[max_words - 1].end()
         truncated = text[:cutoff_pos].rstrip()
@@ -77,20 +73,11 @@ def enforce_word_limits(text, min_words=450, max_words=490):
         if last_end != -1:
             truncated = truncated[:last_end + 1]
         return truncated, "truncated"
+    
     if count < min_words:
         return text, "too_short"
+        
     return text, "ok"
-
-extend_response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=extend_prompt,
-    config={"temperature": 0.6, "max_output_tokens": 3500} # Higher temp for more variety
-)
-extension_text = extract_text_from_response(extend_response)
-extension_text = re.sub(r"^(Here is|Certainly|Sure|As requested).*?:\n*", "", extension_text, flags=re.IGNORECASE | re.DOTALL).strip()
-                    
-# Append the new text to our running draft
-report_text += "\n\n" + extension_text
 
 # ── API key persistence ───────────────────────────────────────────────────────
 
@@ -170,14 +157,14 @@ if st.button("Generate Report"):
     elif not client:
         st.error("Please provide your API key in the sidebar.")
     else:
-        # Step 1: Validate (Q1)
+        # Step 1: Validate
         with st.spinner("Step 1: Validating industry..."):
             if not is_valid_industry(client, industry):
                 st.error(f"'{industry}' does not appear to be a recognized industry.")
                 st.warning("Please update your inquiry with a valid economic sector to proceed.")
                 st.stop()
 
-        # Step 2: Fetch URLs (Q2)
+        # Step 2: Fetch URLs
         with st.spinner("Step 2: Finding top 5 Wikipedia sources..."):
             relevant_urls, all_texts = get_wikipedia_urls(industry)
 
@@ -190,54 +177,76 @@ if st.button("Generate Report"):
             st.write(f"{i}. {url}")
         st.divider()
 
-        # Step 3: Generate Report (Q3)
-        with st.spinner("Step 3: Drafting industry report (450 < 500 words)..."):
+        # Step 3: Generate & Extend Report
+        with st.spinner("Step 3: Drafting industry report (Enforcing 450-500 word limit)..."):
             full_context = "\n\n".join(text[:4000] for text in all_texts)
             
-            # Formatted cleanly to avoid multiline syntax errors
             report_prompt = (
                 f"You are a Market Research Analyst.\n"
-                f"Write an industry report on '{industry}' based ONLY on the context below.\n\n"
+                f"Write a comprehensive industry report on '{industry}' based ONLY on the context below.\n\n"
                 f"STRUCTURE:\n- Executive Summary\n- Market Dynamics\n- Key Trends\n- Competitive Landscape\n- Future Outlook\n\n"
                 f"RULES:\n- Total word count MUST be strictly between 450 and 500 words.\n- Highly professional, data-driven tone.\n\n"
                 f"CONTEXT:\n{full_context}"
             )
 
             try:
+                # 1. Generate initial draft
                 report_response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=report_prompt,
-                    config={"temperature": 0.4, "max_output_tokens": 3500}
+                    config={"temperature": 0.4, "max_output_tokens": 1500}
                 )
                 report_text = extract_text_from_response(report_response)
-
-                if not report_text.strip():
-                    st.error("⚠️ Model returned empty response. Please try again.")
-                    st.stop()
-
-                # Cleanup and word count enforcement
                 report_text = re.sub(r"^(Here is|Certainly|Sure|As requested).*?:\n*", "", report_text, flags=re.IGNORECASE | re.DOTALL).strip()
+                
+                # 2. The "Keep Extending" Loop
+                max_extensions = 3
+                for attempt in range(max_extensions):
+                    current_count = word_count(report_text)
+                    
+                    if current_count >= 450:
+                        break  # We hit the target, exit the loop!
+                        
+                    words_needed = 450 - current_count
+                    st.toast(f"Draft is {current_count} words. Extending by ~{words_needed} words...")
+                    
+                    extend_prompt = (
+                        f"You are a Market Research Analyst writing a report on '{industry}'.\n"
+                        f"Here is your draft so far:\n\n{report_text}\n\n"
+                        f"This draft is {current_count} words. It MUST be at least 450 words.\n"
+                        f"Write an additional section titled 'Additional Market Insights & Risks' that is at least {words_needed + 40} words long.\n"
+                        f"Use this context and DO NOT repeat what you already wrote:\n{full_context}"
+                    )
+                    
+                    extend_response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=extend_prompt,
+                        config={"temperature": 0.6, "max_output_tokens": 800}
+                    )
+                    extension_text = extract_text_from_response(extend_response)
+                    extension_text = re.sub(r"^(Here is|Certainly|Sure|As requested).*?:\n*", "", extension_text, flags=re.IGNORECASE | re.DOTALL).strip()
+                    
+                    report_text += "\n\n" + extension_text
+                    
+                # 3. Final Check & Trim
                 report_text, status = enforce_word_limits(report_text, min_words=450, max_words=490)
                 final_count = word_count(report_text)
-
-                # Output
+                
+                # 4. Display Output
                 st.subheader(f"Step 3: {industry.title()} Industry Report")
                 st.write(report_text)
                 st.divider()
                 st.info(f"📊 Final Word Count: {final_count} words")
-
+                
                 if status == "truncated":
                     st.info(f"✂️ Report trimmed to {final_count} words to strictly adhere to the sub-500 word limit.")
                 elif status == "too_short":
-                    st.warning(f"⚠️ The AI generated a report that is too short ({final_count} words). It failed to meet the 450-word minimum.")
+                    st.warning(f"⚠️ Even after extending, the report is only {final_count} words. The Wikipedia context may not have enough data to support a longer report.")
                 else:
                     st.success("✅ Report successfully generated and meets all constraints.")
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
-
-
-
 
 
 
