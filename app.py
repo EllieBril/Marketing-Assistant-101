@@ -232,26 +232,39 @@ if st.button("Generate Report"):
             - Competitive Landscape
             - Future Outlook & Challenges
 
-            STRICT RULES:
-            - The entire report MUST be less than 500 words.
-            - Write in a highly professional, data-driven tone.
-            - Synthesize information ONLY from the provided Wikipedia context. Do not invent external data.
-
-            WIKIPEDIA CONTEXT:
-            {full_context}
-            """
-
             try:
-                report_response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=report_prompt,
-                    config={"temperature": 0.4, "max_output_tokens": 3000}
-                )
-                report_text = extract_text_from_response(report_response)
+                report_parts = []
 
-                if not report_text.strip():
-                    st.error("⚠️ Model returned an empty response. Please try again.")
-                    st.stop()
+                for section in sections:
+                    section_prompt = f"""
+                    You are a senior Market Research Analyst.
+                    Write ONLY the "{section}" section of an industry report on: "{industry}".
+
+                    STRICT RULES:
+                    - Write between 90 and 100 words. No more, no less.
+                    - Start directly with the section heading: {section}
+                    - Write in a professional, data-driven tone.
+                    - Output ONLY the section text. No commentary, no word count.
+
+                    WIKIPEDIA CONTEXT:
+                    {full_context}
+                    """
+
+                    section_response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=section_prompt,
+                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 8000}
+                    )
+                    section_text = extract_text_from_response(section_response)
+
+                    if not section_text.strip():
+                        st.error(f"⚠️ Model returned empty response for section: {section}")
+                        st.stop()
+
+                    report_parts.append(section_text.strip())
+
+                # Join all 5 sections into one report
+                report_text = "\n\n".join(report_parts)
 
                 # Strip common AI filler prefixes
                 report_text = re.sub(
@@ -276,4 +289,5 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
