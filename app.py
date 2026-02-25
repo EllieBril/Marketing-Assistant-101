@@ -113,27 +113,6 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
-
-def is_valid_industry(client, user_input):
-    text = user_input.strip()
-    if len(text) < 3 or text.isdigit():
-        return False
-    if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-\/]+$', text):
-        return False
-    
-    try:
-        validation_prompt = f"Categorize the term '{text}' into one of two tags: [INDUSTRY] for real economic sectors, or [INVALID] for fictional characters, specific people, cities, or random objects. Return ONLY the tag."
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=validation_prompt,
-            config={"temperature": 0.0} 
-        )
-        verdict = extract_text_from_response(response).upper()
-        return "[INDUSTRY]" in verdict
-    except Exception:
-        return False
-
-
 def word_count(text):
     """Return the number of words in a string."""
     return len(re.findall(r"\b\w+\b", text))
@@ -354,4 +333,5 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
