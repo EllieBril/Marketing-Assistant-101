@@ -21,10 +21,10 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
- report_text = re.sub(
-                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
-                    "", report_text, flags=re.IGNORECASE | re.DOTALL
-                ).strip()
+report_text = re.sub(
+    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
+    "", report_text, flags=re.IGNORECASE | re.DOTALL
+).strip()
 
 def extract_text_from_response(response):
     """Safely extract plain text from a Gemini response object."""
@@ -321,6 +321,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
