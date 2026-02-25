@@ -242,8 +242,7 @@ if st.button("Generate Report"):
 )
                                     report_text = extract_text_from_response(refine_response)
                                    
-
-                               # FINAL DISPLAY
+# FINAL DISPLAY
 words = re.findall(r'\b\w+\b', report_text)
 final_count = len(words)
 
@@ -278,6 +277,7 @@ elif final_count > 500:
     st.warning("⚠️ Report could not be trimmed within range.")
 else:
     st.success(f"✅ Report meets the 450–500 word target.")
+
 
 
 
