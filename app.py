@@ -53,7 +53,7 @@ def is_valid_industry(client, user_input):
             model="gemini-1.5-flash",
             contents=validation_prompt,
             config={
-                "temperature": 0.0, # Forces the most likely/boring answer (YES or NO)
+                "temperature": 0.5, # Forces the most likely/boring answer (YES or NO)
             }
         )
         
@@ -272,6 +272,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
