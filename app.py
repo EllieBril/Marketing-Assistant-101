@@ -32,7 +32,9 @@ def extract_text_from_response(response):
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
 def is_valid_industry(client, user_input):
-    user_input = user_input.strip().lower()
+    user_input = user_input.strip()
+    if not user_input:
+        return False
 
     # --- LAYER 1: CHARACTER FILTER (Regex) ---
     # Rejects anything that isn't English letters, spaces, or hyphens
@@ -42,29 +44,25 @@ def is_valid_industry(client, user_input):
     # --- LAYER 3: LLM CLASSIFIER (The Gatekeeper) ---
     try:
         # We use a 'schema' approach here to force the AI to behave like a computer
-        validation_prompt = (
-            f"Classify the input: '{user_input}'.\n"
-            "Is this a recognized professional business industry or economic sector?\n"
-            "Constraint: Answer with exactly one word, either 'TRUE' or 'FALSE'.\n"
-            "If it is a fictional concept, a specific person, or a general hobby, answer 'FALSE'."
-        )
+        validation_prompt = f"""
+        Analyze if the following term is a business industry, economic sector, or professional niche.
+        Term: "{user_input}"
 
+        Return 'TRUE' if it is a valid business category (e.g., 'SaaS', 'Fintech', 'Agriculture', 'Healthcare').
+        Return 'FALSE' if it is a person, a fictional character, a specific city, or a random hobby (e.g., 'Batman', 'Pizza', 'London').
+
+        Answer ONLY with 'TRUE' or 'FALSE'.
+        """
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=validation_prompt,
-            config={
-                "temperature": 0.5, # Forces the most likely/boring answer (YES or NO)
-            }
+        model="gemini-1.5-flash",
+        contents=validation_prompt,
+        config={
+        "temperature": 0.5, # Slightly above 0 to allow for better reasoning
+        }
         )
-        
         verdict = extract_text_from_response(response).upper()
-        
-        # We only proceed if the AI says EXACTLY TRUE
-        return "TRUE" in verdict
-        
-    except Exception:
-        return False
-
+        except Exception:
+        return True
 
 def enforce_word_limits(text, min_words=450, max_words=500):
     """
@@ -272,6 +270,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
