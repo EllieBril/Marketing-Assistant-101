@@ -70,6 +70,15 @@ def is_valid_industry(client, user_input):
 
         Input: "{text}"
 
+        def extract_text_from_response(response):
+    """Safely extract plain text from a Gemini response object."""
+    text_output = ""
+    if response and response.candidates:
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "text") and part.text:
+                text_output += part.text
+    return text_output.replace("\u0000", "").replace("\r", "").strip()
+
         Answer YES if it is a recognised industry, sector, market, or business niche.
         Examples of YES: "SaaS", "Renewable Energy", "Cybersecurity", "Fintech", "Pet Grooming", "NFTs"
 
@@ -333,5 +342,6 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
