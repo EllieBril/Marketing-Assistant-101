@@ -192,7 +192,11 @@ if st.button("Generate Report"):
                                     contents=prompt,
                                     config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 1500}
                                 )
-                                report_text = current_response.text.replace('\u0000', '').replace('\r', '').strip()
+                                report_text = ""
+                            if current_response.candidates:
+                                for part in current_response.candidates[0].content.parts:
+                                    if hasattr(part, "text"):
+                                        report_text += part.text
                                 
                                 # ITERATIVE REFINEMENT LOOP
                                 import re
@@ -256,6 +260,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
