@@ -176,7 +176,7 @@ if st.button("Generate Report"):
                         with st.spinner("Drafting your industry report..."):
                           
                             full_context = "\n\n NEXT SOURCE\n\n".join(
-                                text[:3000] for text in all_texts
+                                text[:6000] for text in all_texts
                             )
                             
                             prompt = f"""
@@ -187,16 +187,7 @@ if st.button("Generate Report"):
                             HARD WORD COUNT LIMITS:
                             - Minimum: 450 words
                             - Maximum: 500 words
-                            
-                            
-                            REPORT STRUCTURE & TARGETS:
-                            1. EXECUTIVE SUMMARY
-                            2. MARKET DYNAMICS & SIZE
-                            3. KEY TECHNOLOGICAL OR SOCIAL TRENDS
-                            4. COMPETITIVE LANDSCAPE
-                            5. FUTURE OUTLOOK & CHALLENGES
-                            
-                            STRICT INSTRUCTION: Do not exceed 500 words. If you reach the limit, conclude the sentence and stop. 
+                
                             Use a professional, data-driven tone. Ensure the total word count is between 450 and 500.
                             
                             CONTEXT (Wikipedia Data):
@@ -245,8 +236,6 @@ if st.button("Generate Report"):
                                         STRICT INSTRUCTION: The report must be 450-500 words.
                                         CURRENT COUNT: {count} words.
                                         
-                                        OUTPUT FORMAT: Output ONLY the 5-section report. No intro text, no conversational filler.
-                                        
                                         WIKIPEDIA DATA:
                                         {full_context}
                                         
@@ -276,6 +265,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
