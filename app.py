@@ -8,8 +8,6 @@ import os
 import re
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
 def get_wikipedia_urls(industry_query):
     """Return URLs and full text for the 5 most relevant Wikipedia pages."""
     search_results = wikipedia.search(industry_query, results=5)
@@ -25,9 +23,7 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
-
 def extract_text_from_response(response):
-    """Safely extract plain text from a Gemini response object."""
     text_output = ""
     if response and response.candidates:
         for part in response.candidates[0].content.parts:
@@ -37,7 +33,6 @@ def extract_text_from_response(response):
 
 
 def is_valid_industry(client, user_input):
-    """Return True if the input looks like a real industry name in English."""
     if user_input.replace(" ", "").isdigit():
         return False
 
@@ -51,7 +46,7 @@ def is_valid_industry(client, user_input):
     3. The input must represent a recognizable industry, sector, or business niche.
 
     Rules for a "NO" verdict:
-    1. If the input is in a foreign language.
+    1. If the input is in a foreign language (e.g., 'Автомобили', '汽车').
     2. If the input is a random string of numbers or symbols.
     3. If the input is a person's name or a non-business concept.
 
@@ -69,7 +64,6 @@ def is_valid_industry(client, user_input):
 
 
 def word_count(text):
-    """Return the number of words in a string."""
     return len(re.findall(r"\b\w+\b", text))
 
 
@@ -106,7 +100,7 @@ def enforce_word_limits(text, min_words=450, max_words=500):
     return text, "ok"
 
 
-# ── API key persistence ───────────────────────────────────────────────────────
+# API key lock
 
 CACHE_FILE = ".gemini_api_key.json"
 
@@ -130,7 +124,7 @@ def load_key_local():
     return None, None
 
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# Sidebar
 
 with st.sidebar:
     st.title("Configuration")
@@ -173,33 +167,26 @@ with st.sidebar:
 
     if not st.session_state.get("api_key_saved"):
         st.warning("Please save your API key to begin.")
-
-
-# ── Gemini client ─────────────────────────────────────────────────────────────
-
 client = None
 if st.session_state.get("api_key_saved"):
     client = genai.Client(api_key=st.session_state.my_api_key_persistent)
-
-
-# ── Main UI ───────────────────────────────────────────────────────────────────
+# Main page
 
 st.title("Market Research Assistant 101")
 industry = st.text_input("Which industry are you researching today?", key="industry_input")
-
 if st.button("Generate Report"):
     if not industry.strip():
         st.error("Please provide an industry name to proceed.")
     elif not client:
         st.error("Please provide your API key in the sidebar.")
     else:
-        # Step 1 — Validate input
+        # Step 1 Validate input
         with st.spinner("Validating industry..."):
             if not is_valid_industry(client, industry):
                 st.error("⚠️ Invalid Input: Please enter a recognised industry name in English.")
                 st.stop()
 
-        # Step 2 — Fetch Wikipedia sources
+        # Step 2 Fetch Wikipedia sources
         with st.spinner("Finding relevant Wikipedia sources..."):
             relevant_urls, all_texts = get_wikipedia_urls(industry)
 
@@ -212,7 +199,7 @@ if st.button("Generate Report"):
             st.write(f"{i}. {url}")
         st.divider()
 
-        # Step 3 — Generate report section by section
+        # Step 3 Generate report section by section
         with st.spinner("Drafting your industry report..."):
 
             full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
@@ -286,4 +273,5 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
