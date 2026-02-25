@@ -178,20 +178,6 @@ with st.sidebar:
 
     default_key = st.session_state.get("my_api_key_persistent", "")
 
-    if st.button("Save API Key"):
-        if api_key_input:
-            expiry_time = time.time() + 1800
-            st.session_state.my_api_key_persistent = api_key_input
-            st.session_state.api_key_expiry = expiry_time
-            st.session_state.api_key_saved = True
-            save_key_local(api_key_input, expiry_time)
-            st.success("API Key saved for 30 minutes!")
-        else:
-            st.error("Please enter a key before saving.")
-
-    if not st.session_state.get("api_key_saved"):
-        st.warning("Please save your API key to begin.")
-
 # Gemini client 
 client = None
 if st.session_state.get("api_key_saved"):
@@ -298,6 +284,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
