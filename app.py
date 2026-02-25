@@ -31,36 +31,41 @@ def extract_text_from_response(response):
                 text_output += part.text
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
-
 def is_valid_industry(client, user_input):
-    if user_input.replace(" ", "").isdigit():
+    """
+    Validates input using Regex for characters and LLM for business context.
+    """
+    user_input = user_input.strip()
+
+    # --- STEP 1: REGEX VALIDATION ---
+    # This pattern allows only English letters (a-z, A-Z), spaces, and hyphens.
+    # It automatically rejects Cyrillic, Kanji, Arabic, numbers, and symbols.
+    if not re.match(r'^[a-zA-Z\s\-]+$', user_input):
         return False
 
-    validation_prompt = f"""
-    You are a strict validation gate for a Market Research tool.
-    Analyze the following input: "{user_input}"
+    # --- STEP 2: MINIMUM LENGTH ---
+    # Prevents single-letter inputs from passing
+    if len(user_input) < 3:
+        return False
 
-    Rules for a "YES" verdict:
-    1. The input must be in the ENGLISH language.
-    2. The input must use the Latin/English alphabet.
-    3. The input must represent a recognizable industry, sector, or business niche.
-
-    Rules for a "NO" verdict:
-    1. If the input is in a foreign language (e.g., 'Автомобили', '汽车').
-    2. If the input is a random string of numbers or symbols.
-    3. If the input is a person's name or a non-business concept.
-
-    Answer ONLY with 'YES' or 'NO'.
-    """
+    # --- STEP 3: LLM BUSINESS CHECK ---
     try:
+        # Using System Instructions to force a strict YES/NO behavior
         response = client.models.generate_content(
             model="gemini-1.5-flash",
-            contents=validation_prompt
+            contents=f"Is the term '{user_input}' a valid business industry or economic sector?",
+            config={
+                "system_instruction": "You are a strict validator. Answer ONLY 'YES' or 'NO'. Reject names of people, cities, or random words.",
+                "temperature": 0.0, 
+            }
         )
+        
         verdict = extract_text_from_response(response).upper()
         return "YES" in verdict
+        
     except Exception:
-        return True  # Don't block the user if the API fails
+        # Fallback: if the AI is down, let the Regex be the final judge
+        return True
 
 
 def word_count(text):
@@ -273,5 +278,6 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
