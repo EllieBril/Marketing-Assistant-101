@@ -90,7 +90,7 @@ def word_count(text):
     """Return the number of words in a string."""
     return len(re.findall(r"\b\w+\b", text))
 
-def enforce_word_limits(text, max_words=490):
+def enforce_word_limits(text, min_words=450, max_words=490):
     """
     Ensure the text strictly stays under the 500-word limit.
     Truncates at the last full sentence if it exceeds max_words.
@@ -218,7 +218,7 @@ if st.button("Generate Report"):
         with st.spinner("Step 3: Drafting your industry report (< 500 words)..."):
             # Concatenate contexts, protecting context window size
             full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
-                text[:4000] for text in all_texts
+                text[:6000] for text in all_texts
             )
 
             report_prompt = f"""
@@ -245,7 +245,7 @@ if st.button("Generate Report"):
                 report_response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=report_prompt,
-                    config={"temperature": 0.4, "max_output_tokens": 1024}
+                    config={"temperature": 0.4, "max_output_tokens": 3000}
                 )
                 report_text = extract_text_from_response(report_response)
 
@@ -276,3 +276,4 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
