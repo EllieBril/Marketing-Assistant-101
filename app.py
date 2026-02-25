@@ -190,7 +190,7 @@ if st.button("Generate Report"):
                                 current_response = client.models.generate_content(
                                     model="gemini-2.5-flash",
                                     contents=prompt,
-                                    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
+                                    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 1500}
                                 )
                                 report_text = current_response.text.replace('\u0000', '').replace('\r', '').strip()
                                 
@@ -238,7 +238,7 @@ if st.button("Generate Report"):
                                     refine_response = client.models.generate_content(
                                         model="gemini-2.5-flash",
                                         contents=refine_instruction,
-                                        config={"temperature": 0.5, "max_output_tokens": 4000}
+                                        config={"temperature": 0.5, "max_output_tokens": 1500}
                                     )
                                     report_text = refine_response.text.replace('\u0000', '').replace('\r', '').strip()
 
@@ -256,5 +256,6 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
