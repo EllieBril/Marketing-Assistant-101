@@ -114,14 +114,24 @@ def get_wikipedia_urls(industry_query):
     return urls, all_texts
 
 
-def extract_text_from_response(response):
-    """Safely extract plain text from a Gemini response object."""
-    text_output = ""
-    if response and response.candidates:
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, "text") and part.text:
-                text_output += part.text
-    return text_output.replace("\u0000", "").replace("\r", "").strip()
+def is_valid_industry(client, user_input):
+    text = user_input.strip()
+    if len(text) < 3 or text.isdigit():
+        return False
+    if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-\/]+$', text):
+        return False
+    
+    try:
+        validation_prompt = f"Categorize the term '{text}' into one of two tags: [INDUSTRY] for real economic sectors, or [INVALID] for fictional characters, specific people, cities, or random objects. Return ONLY the tag."
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=validation_prompt,
+            config={"temperature": 0.0} 
+        )
+        verdict = extract_text_from_response(response).upper()
+        return "[INDUSTRY]" in verdict
+    except Exception:
+        return False
 
 
 def word_count(text):
@@ -344,3 +354,4 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
