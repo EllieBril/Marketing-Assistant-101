@@ -26,7 +26,6 @@ def get_wikipedia_urls(industry_query):
             
     return urls, all_texts
 def extract_text_from_response(response):
-    """Safely extracts text from the Gemini response object."""
     text_output = ""
     if response and response.candidates:
         for part in response.candidates[0].content.parts:
@@ -35,7 +34,6 @@ def extract_text_from_response(response):
     return text_output.replace('\u0000', '').replace('\r', '').strip()
     
 def is_valid_industry(client, user_input):
-    # 1. Quick check: If it's just numbers, it's definitely not an industry
     if user_input.replace(" ", "").isdigit():
         return False
 
@@ -59,14 +57,10 @@ def is_valid_industry(client, user_input):
 
     # 3. Call the model
     try:
-        # Note: Ensure you use a valid model name like "gemini-1.5-flash" 
-        # as "gemini-2.5-flash" might not be released/correct yet.
         response = client.models.generate_content(
             model="gemini-1.5-flash", 
             contents=validation_prompt
         )
-        
-        # Extract text safely using your existing helper
         verdict = extract_text_from_response(response).upper()
         
         return "YES" in verdict
@@ -94,14 +88,12 @@ def load_key_local():
             pass
     return None, None
 
-
 with st.sidebar:
     st.title("Configuration")
     st.header("Settings")
 
     llm_choice = st.selectbox("Select LLM", ["Gemini 2.5 Flash"]) 
     
-    # load from local storage if not in session state
     if "my_api_key_persistent" not in st.session_state:
         saved_key, saved_expiry = load_key_local()
         if saved_key and saved_expiry:
@@ -200,7 +192,7 @@ if st.button("Generate Report"):
                                 current_response = client.models.generate_content(
                                     model="gemini-2.5-flash",
                                     contents=prompt,
-                                    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
+                                    config={"temperature": 0.4, "top_p": 0.95, "max_output_tokens": 3000}
                                 )
                                 report_text = extract_text_from_response(current_response)
                                 
@@ -251,20 +243,42 @@ if st.button("Generate Report"):
                                     report_text = extract_text_from_response(refine_response)
                                    
 
-                                # FINAL DISPLAY
-                                st.subheader(f"{industry} Industry Report")
-                                st.write(report_text)
-                                
-                                final_words = re.findall(r'\b\w+\b', report_text)
-                                final_count = len(final_words)
-                                st.divider()
-                                st.info(f"📊 Final Word Count: {final_count} words")
+                               # FINAL DISPLAY
+words = re.findall(r'\b\w+\b', report_text)
+final_count = len(words)
 
-                                if final_count < 450 or final_count > 500:
-                                    st.warning("⚠️ The AI hit its maximum refinement attempts but remained slightly out of range.")
-                                    
-                            except Exception as e:
-                                st.error(f"Error generating report: {e}")
+# Hard truncate if over 500 words
+if final_count > 500:
+    # Find the position of the 500th word in the original text and cut there
+    word_matches = list(re.finditer(r'\b\w+\b', report_text))
+    cutoff_pos = word_matches[499].end()  # index 499 = 500th word
+    report_text = report_text[:cutoff_pos].rstrip()
+    
+    # Clean up any dangling incomplete sentence or bullet
+    if not report_text.endswith(('.', '!', '?')):
+        last_sentence_end = max(
+            report_text.rfind('.'),
+            report_text.rfind('!'),
+            report_text.rfind('?')
+        )
+        if last_sentence_end != -1:
+            report_text = report_text[:last_sentence_end + 1]
+
+    # Recount after truncation
+    final_count = len(re.findall(r'\b\w+\b', report_text))
+
+st.subheader(f"{industry} Industry Report")
+st.write(report_text)
+st.divider()
+st.info(f"📊 Final Word Count: {final_count} words")
+
+if final_count < 450:
+    st.warning("⚠️ Report is under 450 words. Consider increasing context or refinement attempts.")
+elif final_count > 500:
+    st.warning("⚠️ Report could not be trimmed within range.")
+else:
+    st.success(f"✅ Report meets the 450–500 word target.")
+
 
 
 
