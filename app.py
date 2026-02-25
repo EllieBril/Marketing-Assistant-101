@@ -248,7 +248,7 @@ if st.button("Generate Report"):
                     section_response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=section_prompt,
-                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 500}
+                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 2000}
                     )
                     section_text = extract_text_from_response(section_response)
 
@@ -286,3 +286,4 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
