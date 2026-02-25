@@ -7,11 +7,7 @@ import json
 import os
 import re
 
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
 def get_wikipedia_urls(industry_query):
-    """Return URLs and full text for the 5 most relevant Wikipedia pages."""
     search_results = wikipedia.search(industry_query, results=5)
     wiki_api = wikipediaapi.Wikipedia(
         user_agent="MarketResearchAssistant 101",
@@ -25,7 +21,6 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
-
 def extract_text_from_response(response):
     """Safely extract plain text from a Gemini response object."""
     text_output = ""
@@ -34,7 +29,6 @@ def extract_text_from_response(response):
             if hasattr(part, "text") and part.text:
                 text_output += part.text
     return text_output.replace("\u0000", "").replace("\r", "").strip()
-
 
 def is_valid_industry(client, user_input):
     """Return True if the input looks like a real industry name in English."""
@@ -68,33 +62,61 @@ def is_valid_industry(client, user_input):
         return True  # Don't block the user if the API fails
 
 
-def truncate_to_500(text):
-    """Hard-truncate text to 500 words, ending on a complete sentence."""
-    word_matches = list(re.finditer(r"\b\w+\b", text))
-    if len(word_matches) <= 500:
-        return text
+def enforce_word_limits(text, min_words=450, max_words=500):
+    """
+    Enforce a word count range on the report text.
+    - If over max_words: truncate to the last complete sentence within the limit.
+    - If under min_words: flag it — text cannot be expanded programmatically.
+    - Returns a tuple: (processed_text, status)
+      status is one of: 'ok', 'truncated', 'too_short'
+    """
+    matches = list(re.finditer(r"\b\w+\b", text))
+    count = len(matches)
 
-    cutoff_pos = word_matches[499].end()
-    truncated = text[:cutoff_pos].rstrip()
+    # Over the upper limit — truncate
+    if count > max_words:
+        cutoff_pos = matches[max_words - 1].end()
+        truncated = text[:cutoff_pos].rstrip()
 
-    # Walk back to the last sentence boundary so it ends cleanly
-    if not truncated.endswith((".", "!", "?")):
-        last_end = max(
-            truncated.rfind("."),
-            truncated.rfind("!"),
-            truncated.rfind("?")
-        )
-        if last_end != -1:
-            truncated = truncated[:last_end + 1]
+        # Walk back to last complete sentence
+        if not truncated.endswith((".", "!", "?")):
+            last_end = max(
+                truncated.rfind("."),
+                truncated.rfind("!"),
+                truncated.rfind("?")
+            )
+            if last_end != -1:
+                truncated = truncated[:last_end + 1]
 
-    return truncated
+        return truncated, "truncated"
+
+    # Under the lower limit — cannot expand programmatically
+    if count < min_words:
+        return text, "too_short"
+
+    # Within range
+    return text, "ok"
 
 
 def word_count(text):
     return len(re.findall(r"\b\w+\b", text))
+# Apply word limit enforcement
+report_text, status = enforce_word_limits(report_text)
+final_count = word_count(report_text)
 
+# Display
+st.subheader(f"{industry} Industry Report")
+st.write(report_text)
+st.divider()
+st.info(f"📊 Final Word Count: {final_count} words")
 
-# ── API Key persistence ───────────────────────────────────────────────────────
+if status == "too_short":
+    st.warning(f"⚠️ Report is under 450 words ({final_count} words). Try regenerating.")
+elif status == "truncated":
+    st.info(f"✂️ Report was trimmed from over 500 words to {final_count} words.")
+else:
+    st.success("✅ Report meets the 450–500 word target.")
+
 
 CACHE_FILE = ".gemini_api_key.json"
 
@@ -299,6 +321,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
