@@ -61,7 +61,7 @@ def is_valid_industry(client, user_input):
         }
         )
         verdict = extract_text_from_response(response).upper()
-        except Exception:
+    except Exception:
         return True
 
 def enforce_word_limits(text, min_words=450, max_words=500):
@@ -270,6 +270,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
