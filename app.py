@@ -28,6 +28,14 @@ def get_wikipedia_urls(industry_query):
 def is_valid_industry(client, user_input):
     if user_input.replace(" ", "").isdigit():
         return False
+
+def extract_text_from_response(response):
+    text_output = ""
+    if response and response.candidates:
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "text") and part.text:
+                text_output += part.text
+    return text_output.replace('\u0000', '').replace('\r', '').strip()
     
     validation_prompt = f"""
     You are a strict validation gate for a Market Research tool. 
@@ -192,11 +200,7 @@ if st.button("Generate Report"):
                                     contents=prompt,
                                     config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 1500}
                                 )
-                                report_text = ""
-                                if current_response.candidates:
-                                    for part in current_response.candidates[0].content.parts:
-                                        if hasattr(part, "text"):
-                                            report_text += part.text
+                                report_text = extract_text_from_response(current_response)
                                 
                                 # ITERATIVE REFINEMENT LOOP
                                 import re
@@ -239,12 +243,8 @@ if st.button("Generate Report"):
                                         {report_text}
                                         """
                                     
-                                    refine_response = client.models.generate_content(
-                                        model="gemini-2.5-flash",
-                                        contents=refine_instruction,
-                                        config={"temperature": 0.5, "max_output_tokens": 1500}
-                                    )
-                                    report_text = refine_response.text.replace('\u0000', '').replace('\r', '').strip()
+                                    refine_response =  extract_text_from_response(current_response)
+                                   
 
                                 # FINAL DISPLAY
                                 st.subheader(f"{industry} Industry Report")
@@ -260,6 +260,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
