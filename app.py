@@ -31,37 +31,53 @@ def extract_text_from_response(response):
                 text_output += part.text
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
+import re
+
 def is_valid_industry(client, user_input):
-    user_input = user_input.strip()
-    if not user_input:
+    """
+    A balanced validator that allows symbols used in industry names 
+    while blocking obvious nonsense.
+    """
+    text = user_input.strip()
+    
+    # 1. FAIL if input is empty or just one/two characters
+    if len(text) < 3:
         return False
 
-    # --- LAYER 1: CHARACTER FILTER (Regex) ---
-    # Rejects anything that isn't English letters, spaces, or hyphens
-    if not re.match(r'^[a-z\s\-]+$', user_input):
+    # 2. FAIL if it's ONLY numbers (e.g., "12345")
+    if text.isdigit():
         return False
 
-    # --- LAYER 3: LLM CLASSIFIER (The Gatekeeper) ---
+    # 3. FAIL if it contains non-Latin characters (e.g., Cyrillic, Kanji)
+    # This allows letters, numbers, spaces, and common symbols like & , . -
+    if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-]+$', text):
+        return False
+
+    # 4. LLM BUSINESS CHECK
     try:
-        # We use a 'schema' approach here to force the AI to behave like a computer
+        # We tell the AI to be "lenient" but "logical"
         validation_prompt = f"""
-        Analyze if the following term is a business industry, economic sector, or professional niche.
-        Term: "{user_input}"
+        Act as a business classifier. 
+        Input: "{text}"
+        
+        Is this a valid business sector, industry, or niche? 
+        (Examples of YES: "SaaS", "Real Estate", "Pet Grooming", "Web 3.0")
+        (Examples of NO: "Batman", "I am hungry", "12345", "Pizza")
 
-        Return 'TRUE' if it is a valid business category (e.g., 'SaaS', 'Fintech', 'Agriculture', 'Healthcare').
-        Return 'FALSE' if it is a person, a fictional character, a specific city, or a random hobby (e.g., 'Batman', 'Pizza', 'London').
-
-        Answer ONLY with 'TRUE' or 'FALSE'.
+        Answer ONLY 'YES' or 'NO'.
         """
+
         response = client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=validation_prompt,
-        config={
-        "temperature": 0.5, # Slightly above 0 to allow for better reasoning
-        }
+            model="gemini-1.5-flash",
+            contents=validation_prompt,
+            config={"temperature": 0.0}
         )
+        
         verdict = extract_text_from_response(response).upper()
+        return "YES" in verdict
+
     except Exception:
+        # If the AI service is busy, let it pass rather than showing an error
         return True
 
 def enforce_word_limits(text, min_words=450, max_words=500):
@@ -270,6 +286,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
