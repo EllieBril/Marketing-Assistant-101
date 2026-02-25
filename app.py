@@ -156,10 +156,9 @@ if st.button("Generate Report"):
                         st.divider()
                         with st.spinner("Drafting your industry report..."):
                           
-                            balanced_context = []
-                            for text in all_texts:
-                                balanced_context.append(text[:6000])
-                            full_context = "\n\n NEXT SOURCE\n\n".join(balanced_context)
+                            full_context = "\n\n NEXT SOURCE\n\n".join(
+                                text[:1500] for text in all_texts
+                            )
                             
                             prompt = f"""
                             You are a senior Market Research Analyst specializing in long-form industry reports. 
@@ -257,4 +256,5 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
