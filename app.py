@@ -259,7 +259,7 @@ if st.button("Generate Report"):
     contents=refine_instruction,
     config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
 )
-report_text = extract_text_from_response(refine_response)
+                                    report_text = extract_text_from_response(refine_response)
                                    
 
                                 # FINAL DISPLAY
@@ -276,6 +276,7 @@ report_text = extract_text_from_response(refine_response)
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
