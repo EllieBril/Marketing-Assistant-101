@@ -32,44 +32,47 @@ def extract_text_from_response(response):
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
 def is_valid_industry(client, user_input):
-    """
-    Validates input using Regex for characters and LLM for business context.
-    """
-    user_input = user_input.strip()
+    user_input = user_input.strip().lower()
 
-    # --- STEP 1: REGEX VALIDATION ---
-    # This pattern allows only English letters (a-z, A-Z), spaces, and hyphens.
-    # It automatically rejects Cyrillic, Kanji, Arabic, numbers, and symbols.
-    if not re.match(r'^[a-zA-Z\s\-]+$', user_input):
+    # --- LAYER 1: CHARACTER FILTER (Regex) ---
+    # Rejects anything that isn't English letters, spaces, or hyphens
+    if not re.match(r'^[a-z\s\-]+$', user_input):
         return False
 
-    # --- STEP 2: MINIMUM LENGTH ---
-    # Prevents single-letter inputs from passing
-    if len(user_input) < 3:
+    # --- LAYER 2: THE "NOT-AN-INDUSTRY" BLACKLIST ---
+    # Instantly block common non-business search types
+    blacklist = [
+        "movie", "book", "character", "song", "person", "celebrity", 
+        "city", "country", "hobby", "game", "recipe", "food"
+    ]
+    if any(word in user_input for word in blacklist):
         return False
 
-    # --- STEP 3: LLM BUSINESS CHECK ---
+    # --- LAYER 3: LLM CLASSIFIER (The Gatekeeper) ---
     try:
-        # Using System Instructions to force a strict YES/NO behavior
+        # We use a 'schema' approach here to force the AI to behave like a computer
+        validation_prompt = (
+            f"Classify the input: '{user_input}'.\n"
+            "Is this a recognized professional business industry or economic sector?\n"
+            "Constraint: Answer with exactly one word, either 'TRUE' or 'FALSE'.\n"
+            "If it is a fictional concept, a specific person, or a general hobby, answer 'FALSE'."
+        )
+
         response = client.models.generate_content(
             model="gemini-1.5-flash",
-            contents=f"Is the term '{user_input}' a valid business industry or economic sector?",
+            contents=validation_prompt,
             config={
-                "system_instruction": "You are a strict validator. Answer ONLY 'YES' or 'NO'. Reject names of people, cities, or random words.",
-                "temperature": 0.0, 
+                "temperature": 0.0, # Forces the most likely/boring answer (YES or NO)
             }
         )
         
         verdict = extract_text_from_response(response).upper()
-        return "YES" in verdict
+        
+        # We only proceed if the AI says EXACTLY TRUE
+        return "TRUE" in verdict
         
     except Exception:
-        # Fallback: if the AI is down, let the Regex be the final judge
-        return True
-
-
-def word_count(text):
-    return len(re.findall(r"\b\w+\b", text))
+        return False
 
 
 def enforce_word_limits(text, min_words=450, max_words=500):
@@ -278,6 +281,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
