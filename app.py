@@ -174,8 +174,6 @@ with st.sidebar:
             st.session_state.my_api_key_persistent = ""
             st.session_state.api_key_expiry = 0
             st.session_state.api_key_saved = False
-            if os.path.exists(CACHE_FILE):
-                os.remove(CACHE_FILE)
             st.warning("API Key expired (30 min limit reached).")
 
     default_key = st.session_state.get("my_api_key_persistent", "")
@@ -303,4 +301,5 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
