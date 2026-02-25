@@ -67,6 +67,7 @@ def word_count(text):
 def enforce_word_limits(text, min_words=450, max_words=490):
     """Ensure text stays under the 500-word limit by truncating at the last sentence."""
     matches = list(re.finditer(r"\b\w+\b", text))
+   
     if len(matches) > max_words:
         cutoff_pos = matches[max_words - 1].end()
         truncated = text[:cutoff_pos].rstrip()
@@ -74,6 +75,8 @@ def enforce_word_limits(text, min_words=450, max_words=490):
         if last_end != -1:
             truncated = truncated[:last_end + 1]
         return truncated, "truncated"
+    if count < min_words:
+        return text, "too_short"
     return text, "ok"
 
 # ── API key persistence ───────────────────────────────────────────────────────
@@ -212,11 +215,14 @@ if st.button("Generate Report"):
 
                 if status == "truncated":
                     st.info(f"✂️ Report trimmed to {final_count} words to strictly adhere to the sub-500 word limit.")
+                elif status == "too_short":
+                    st.warning(f"⚠️ The AI generated a report that is too short ({final_count} words). It failed to meet the 450-word minimum.")
                 else:
                     st.success("✅ Report successfully generated and meets all constraints.")
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
