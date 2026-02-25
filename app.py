@@ -6,8 +6,22 @@ import time
 import json
 import os
 import re
+import requests
+from difflib import get_close_matches
 
-
+@st.cache_data(show_spinner=False)
+def load_bls_industries():
+    """Fetch and cache the official BLS industry list at app startup."""
+    try:
+        response = requests.get(
+            "https://www.bls.gov/iag/tgs/iag_index_alpha.htm", timeout=10
+        )
+        # Extract all industry names from list items using regex
+        matches = re.findall(r'<li><a href="iag[^"]+">([^<]+)</a>', response.text)
+        # Lowercase for case-insensitive matching
+        return [m.strip().lower() for m in matches if m.strip()]
+    except Exception:
+        return []  # If fetch fails, fall back to LLM only
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_wikipedia_urls(industry_query):
@@ -49,7 +63,8 @@ def is_valid_industry(client, user_input):
 
     try:
         validation_prompt = f"""
-        Act as a business classifier.
+        You are a strict classifier for a Market Research tool.
+        Your job is to decide if the input below is a real business industry or sector.
         Input: "{text}"
 
         Is this a valid business sector, industry, or niche?
@@ -285,3 +300,4 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
