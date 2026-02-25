@@ -242,41 +242,43 @@ if st.button("Generate Report"):
 )
                                     report_text = extract_text_from_response(refine_response)
                                    
-# FINAL DISPLAY
-words = re.findall(r'\b\w+\b', report_text)
-final_count = len(words)
 
-# Hard truncate if over 500 words
-if final_count > 500:
-    # Find the position of the 500th word in the original text and cut there
-    word_matches = list(re.finditer(r'\b\w+\b', report_text))
-    cutoff_pos = word_matches[499].end()  # index 499 = 500th word
-    report_text = report_text[:cutoff_pos].rstrip()
-    
-    # Clean up any dangling incomplete sentence or bullet
-    if not report_text.endswith(('.', '!', '?')):
-        last_sentence_end = max(
-            report_text.rfind('.'),
-            report_text.rfind('!'),
-            report_text.rfind('?')
-        )
-        if last_sentence_end != -1:
-            report_text = report_text[:last_sentence_end + 1]
+    # FINAL DISPLAY
+    words = re.findall(r'\b\w+\b', report_text)
+    final_count = len(words)
 
-    # Recount after truncation
-    final_count = len(re.findall(r'\b\w+\b', report_text))
+    # Hard truncate if over 500 words
+    if final_count > 500:
+        word_matches = list(re.finditer(r'\b\w+\b', report_text))
+        cutoff_pos = word_matches[499].end()
+        report_text = report_text[:cutoff_pos].rstrip()
 
-st.subheader(f"{industry} Industry Report")
-st.write(report_text)
-st.divider()
-st.info(f"📊 Final Word Count: {final_count} words")
+        if not report_text.endswith(('.', '!', '?')):
+            last_sentence_end = max(
+                report_text.rfind('.'),
+                report_text.rfind('!'),
+                report_text.rfind('?')
+            )
+            if last_sentence_end != -1:
+                report_text = report_text[:last_sentence_end + 1]
 
-if final_count < 450:
-    st.warning("⚠️ Report is under 450 words. Consider increasing context or refinement attempts.")
-elif final_count > 500:
-    st.warning("⚠️ Report could not be trimmed within range.")
-else:
-    st.success(f"✅ Report meets the 450–500 word target.")
+        final_count = len(re.findall(r'\b\w+\b', report_text))
+
+    st.subheader(f"{industry} Industry Report")
+    st.write(report_text)
+    st.divider()
+    st.info(f"📊 Final Word Count: {final_count} words")
+
+    if final_count < 450:
+        st.warning("⚠️ Report is under 450 words. Consider increasing context or refinement attempts.")
+    elif final_count > 500:
+        st.warning("⚠️ Report could not be trimmed within range.")
+    else:
+        st.success(f"✅ Report meets the 450–500 word target.")
+
+except Exception as e:
+    st.error(f"Error generating report: {e}")
+
 
 
 
