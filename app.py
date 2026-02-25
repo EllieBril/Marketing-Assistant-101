@@ -187,61 +187,7 @@ if st.button("Generate Report"):
                             
                             Please write the report now, ensuring it is thorough, professional, and meets the 450-500 word target.
                             """
-                            try:
-                                # INITIAL GENERATION
-                                current_response = client.models.generate_content(
-                                    model="gemini-2.5-flash",
-                                    contents=prompt,
-                                    config={"temperature": 0.4, "top_p": 0.95, "max_output_tokens": 3000}
-                                )
-                                report_text = extract_text_from_response(current_response)
-                                
-                                # ITERATIVE REFINEMENT LOOP
-                        
-                                max_attempts = 3
-                                for attempt in range(max_attempts):
-                                    # Strip common AI chat prefixes to get accurate word count
-                                    clean_report = re.sub(r'^(Here is|Certainly|Sure|As requested).*?:\n*', '', report_text, flags=re.IGNORECASE | re.DOTALL).strip()
-                                    report_text = clean_report
-                                    
-                                    words = re.findall(r'\b\w+\b', report_text)
-                                    count = len(words)
-                                    
-                                    if 450 <= count <= 500:
-                                        report_text = clean_report
-                                        break
-                                    
-                                    # Refine with original context and strict length instructions
-                                    if count < 450:
-                                        refine_instruction = f"""
-                                        STRICT INSTRUCTION: The report must be 450-500 words.
-                                        CURRENT COUNT: {count} words.
-                                        
-                                        WIKIPEDIA DATA:
-                                        {full_context}
-                                        
-                                        CURRENT DRAFT:
-                                        {report_text}
-                                        """
-                                    else:
-                                        refine_instruction = f"""
-                                        STRICT INSTRUCTION: The report must be 450-500 words.
-                                        CURRENT COUNT: {count} words.
-                                        
-                                        WIKIPEDIA DATA:
-                                        {full_context}
-                                        
-                                        CURRENT DRAFT:
-                                        {report_text}
-                                        """
-                                    
-                                    refine_response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=refine_instruction,
-    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
-)
-                                    report_text = extract_text_from_response(refine_response)
-                                   
+                           
 
     # FINAL DISPLAY
     words = re.findall(r'\b\w+\b', report_text)
@@ -278,7 +224,6 @@ if st.button("Generate Report"):
 
 except Exception as e:
     st.error(f"Error generating report: {e}")
-
 
 
 
