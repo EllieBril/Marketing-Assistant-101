@@ -51,35 +51,57 @@ def extract_text_from_response(response):
 
 
 def is_valid_industry(client, user_input):
-    """Return True if the input looks like a real industry name in English."""
+    """
+    Two-stage validation:
+    1. Fuzzy match against the official BLS industry list (fast, no API call).
+    2. LLM fallback for modern/niche industries not on the BLS list (e.g. SaaS, NFTs).
+    """
     text = user_input.strip()
 
+    # Basic sanity checks
     if len(text) < 3:
         return False
     if text.isdigit():
         return False
-    if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-]+$', text):
+    if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-\/]+$', text):
         return False
 
+    # Stage 1 — BLS fuzzy match
+    bls_industries = load_bls_industries()
+    if bls_industries:
+        close = get_close_matches(text.lower(), bls_industries, n=1, cutoff=0.6)
+        if close:
+            return True  # Confirmed match — no LLM call needed
+
+    # Stage 2 — LLM fallback for modern/niche industries
     try:
         validation_prompt = f"""
         You are a strict classifier for a Market Research tool.
-        Your job is to decide if the input below is a real business industry or sector.
+        Your job is to decide if the input is a real business industry or sector.
+
         Input: "{text}"
 
-        Is this a valid business sector, industry, or niche?
-        (Examples of YES: "SaaS", "Real Estate", "Pet Grooming", "Web 3.0")
-        (Examples of NO: "Batman", "I am hungry", "12345", "Pizza")
+        Answer YES if it is a recognised industry, sector, market, or business niche.
+        Examples of YES: "SaaS", "Renewable Energy", "Cybersecurity", "NFTs", "Pet Grooming"
 
-        Answer ONLY 'YES' or 'NO'.
+        Answer NO for everything else:
+        - Fictional characters (e.g. "Batman", "Spiderman")
+        - People's names (e.g. "Elon Musk")
+        - Random words or sentences (e.g. "I am hungry", "blue sky")
+        - Specific companies (e.g. "Apple Inc", "Tesla")
+        - Places alone (e.g. "London", "France")
+        - Vague concepts (e.g. "happiness", "nature")
+
+        Answer ONLY with YES or NO. No explanation.
         """
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=validation_prompt,
             config={"temperature": 0.0}
         )
-        verdict = extract_text_from_response(response).upper()
-        return "YES" in verdict
+        verdict = extract_text_from_response(response).strip().upper()
+        return verdict == "YES"
+
     except Exception:
         return True
 
@@ -300,4 +322,5 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
