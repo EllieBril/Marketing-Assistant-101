@@ -8,6 +8,8 @@ import os
 import re
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
 def get_wikipedia_urls(industry_query):
     """Return URLs and full text for the 5 most relevant Wikipedia pages."""
     search_results = wikipedia.search(industry_query, results=5)
@@ -23,7 +25,9 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
+
 def extract_text_from_response(response):
+    """Safely extract plain text from a Gemini response object."""
     text_output = ""
     if response and response.candidates:
         for part in response.candidates[0].content.parts:
@@ -31,54 +35,44 @@ def extract_text_from_response(response):
                 text_output += part.text
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
-import re
 
 def is_valid_industry(client, user_input):
-    """
-    A balanced validator that allows symbols used in industry names 
-    while blocking obvious nonsense.
-    """
+    """Return True if the input looks like a real industry name in English."""
     text = user_input.strip()
-    
-    # 1. FAIL if input is empty or just one/two characters
+
     if len(text) < 3:
         return False
-
-    # 2. FAIL if it's ONLY numbers (e.g., "12345")
     if text.isdigit():
         return False
-
-    # 3. FAIL if it contains non-Latin characters (e.g., Cyrillic, Kanji)
-    # This allows letters, numbers, spaces, and common symbols like & , . -
     if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-]+$', text):
         return False
 
-    # 4. LLM BUSINESS CHECK
     try:
-        # We tell the AI to be "lenient" but "logical"
         validation_prompt = f"""
-        Act as a business classifier. 
+        Act as a business classifier.
         Input: "{text}"
-        
-        Is this a valid business sector, industry, or niche? 
+
+        Is this a valid business sector, industry, or niche?
         (Examples of YES: "SaaS", "Real Estate", "Pet Grooming", "Web 3.0")
         (Examples of NO: "Batman", "I am hungry", "12345", "Pizza")
 
         Answer ONLY 'YES' or 'NO'.
         """
-
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=validation_prompt,
             config={"temperature": 0.0}
         )
-        
         verdict = extract_text_from_response(response).upper()
         return "YES" in verdict
-
     except Exception:
-        # If the AI service is busy, let it pass rather than showing an error
         return True
+
+
+def word_count(text):
+    """Return the number of words in a string."""
+    return len(re.findall(r"\b\w+\b", text))
+
 
 def enforce_word_limits(text, min_words=450, max_words=500):
     """
@@ -95,7 +89,6 @@ def enforce_word_limits(text, min_words=450, max_words=500):
     if count > max_words:
         cutoff_pos = matches[max_words - 1].end()
         truncated = text[:cutoff_pos].rstrip()
-
         if not truncated.endswith((".", "!", "?")):
             last_end = max(
                 truncated.rfind("."),
@@ -104,7 +97,6 @@ def enforce_word_limits(text, min_words=450, max_words=500):
             )
             if last_end != -1:
                 truncated = truncated[:last_end + 1]
-
         return truncated, "truncated"
 
     if count < min_words:
@@ -113,7 +105,7 @@ def enforce_word_limits(text, min_words=450, max_words=500):
     return text, "ok"
 
 
-# API key lock
+# ── API key persistence ───────────────────────────────────────────────────────
 
 CACHE_FILE = ".gemini_api_key.json"
 
@@ -137,7 +129,7 @@ def load_key_local():
     return None, None
 
 
-# Sidebar
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.title("Configuration")
@@ -180,26 +172,33 @@ with st.sidebar:
 
     if not st.session_state.get("api_key_saved"):
         st.warning("Please save your API key to begin.")
+
+
+# ── Gemini client ─────────────────────────────────────────────────────────────
+
 client = None
 if st.session_state.get("api_key_saved"):
     client = genai.Client(api_key=st.session_state.my_api_key_persistent)
-# Main page
+
+
+# ── Main UI ───────────────────────────────────────────────────────────────────
 
 st.title("Market Research Assistant 101")
 industry = st.text_input("Which industry are you researching today?", key="industry_input")
+
 if st.button("Generate Report"):
     if not industry.strip():
         st.error("Please provide an industry name to proceed.")
     elif not client:
         st.error("Please provide your API key in the sidebar.")
     else:
-        # Step 1 Validate input
+        # Step 1 — Validate input
         with st.spinner("Validating industry..."):
             if not is_valid_industry(client, industry):
                 st.error("⚠️ Invalid Input: Please enter a recognised industry name in English.")
                 st.stop()
 
-        # Step 2 Fetch Wikipedia sources
+        # Step 2 — Fetch Wikipedia sources
         with st.spinner("Finding relevant Wikipedia sources..."):
             relevant_urls, all_texts = get_wikipedia_urls(industry)
 
@@ -212,7 +211,7 @@ if st.button("Generate Report"):
             st.write(f"{i}. {url}")
         st.divider()
 
-        # Step 3 Generate report section by section
+        # Step 3 — Generate report section by section
         with st.spinner("Drafting your industry report..."):
 
             full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
@@ -248,7 +247,7 @@ if st.button("Generate Report"):
                     section_response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=section_prompt,
-                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 2000}
+                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 8000}
                     )
                     section_text = extract_text_from_response(section_response)
 
@@ -286,12 +285,3 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
-
-
-
-
-
-
-
-
-
