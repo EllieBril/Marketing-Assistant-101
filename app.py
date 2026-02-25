@@ -187,7 +187,20 @@ if st.button("Generate Report"):
                             
                             Please write the report now, ensuring it is thorough, professional, and meets the 450-500 word target.
                             """
+try:
+    report_text = ""  # ← add this as the very first line inside try
 
+    # INITIAL GENERATION
+    current_response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
+    )
+    report_text = extract_text_from_response(current_response)
+
+    if not report_text or not report_text.strip():
+        st.error("⚠️ The model returned an empty response. Check your API key or try again.")
+        st.stop()
 
     report_text = extract_text_from_response(current_response)
 
@@ -270,6 +283,7 @@ elif final_count > 500:
     st.warning("⚠️ Report could not be trimmed within range.")
 else:
     st.success(f"✅ Report meets the 450–500 word target.")
+
 
 
 
