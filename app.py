@@ -237,8 +237,7 @@ if st.button("Generate Report"):
 
                 for section in sections:
                     section_prompt = f"""
-                    You are a senior Market Research Analyst.
-                    Write ONLY the "{section}" section of an industry report on: "{industry}".
+                You are a senior Market Research Analyst. Write ONLY the "{section}" section of an industry report on: "{industry}".
 
                     STRICT RULES:
                     - Write between 90 and 100 words. No more, no less.
@@ -289,5 +288,6 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
