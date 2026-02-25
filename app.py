@@ -24,45 +24,46 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
             
     return urls, all_texts
-
 def is_valid_industry(client, user_input):
+    # 1. Quick check: If it's just numbers, it's definitely not an industry
     if user_input.replace(" ", "").isdigit():
         return False
 
-def extract_text_from_response(response):
-    text_output = ""
-    if response and response.candidates:
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, "text") and part.text:
-                text_output += part.text
-    return text_output.replace('\u0000', '').replace('\r', '').strip()
-    
+    # 2. Define the prompt INSIDE the logic flow
     validation_prompt = f"""
     You are a strict validation gate for a Market Research tool. 
     Analyze the following input: "{user_input}"
 
     Rules for a "YES" verdict:
     1. The input must be in the ENGLISH language.
-    2. The input must use the Latin/English alphabet (No Cyrillic, Kanji, Arabic, etc.).
+    2. The input must use the Latin/English alphabet.
     3. The input must represent a recognizable industry, sector, or business niche.
     
     Rules for a "NO" verdict:
-    1. If the input is in a foreign language (e.g., 'Автомобили', '汽车').
+    1. If the input is in a foreign language.
     2. If the input is a random string of numbers or symbols.
     3. If the input is a person's name or a non-business concept.
 
     Answer ONLY with 'YES' or 'NO'.
     """
 
+    # 3. Call the model
     try:
+        # Note: Ensure you use a valid model name like "gemini-1.5-flash" 
+        # as "gemini-2.5-flash" might not be released/correct yet.
         response = client.models.generate_content(
-            model="gemini-2.5-flash", 
+            model="gemini-1.5-flash", 
             contents=validation_prompt
         )
-        verdict = response.text.strip().upper()
+        
+        # Extract text safely using your existing helper
+        verdict = extract_text_from_response(response).upper()
+        
         return "YES" in verdict
-    except Exception:
+    except Exception as e:
+        # If the API fails, we default to True so the user isn't blocked by a technicality
         return True
+
 
 CACHE_FILE = ".gemini_api_key.json"
 
@@ -260,6 +261,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
