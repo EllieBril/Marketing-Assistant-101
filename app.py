@@ -64,7 +64,7 @@ def is_valid_industry(client, user_input):
 def word_count(text):
     return len(re.findall(r"\b\w+\b", text))
 
-def enforce_word_limits(text, max_words=490):
+def enforce_word_limits(text, min_words=450, max_words=490):
     """Ensure text stays under the 500-word limit by truncating at the last sentence."""
     matches = list(re.finditer(r"\b\w+\b", text))
     if len(matches) > max_words:
@@ -191,7 +191,7 @@ if st.button("Generate Report"):
                 report_response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=report_prompt,
-                    config={"temperature": 0.4, "max_output_tokens": 1024}
+                    config={"temperature": 0.4, "max_output_tokens": 3000}
                 )
                 report_text = extract_text_from_response(report_response)
 
@@ -217,3 +217,4 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
