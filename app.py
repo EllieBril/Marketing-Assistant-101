@@ -175,7 +175,7 @@ if st.button("Generate Report"):
         st.divider()
 
         # Step 3: Generate Report (Q3)
-        with st.spinner("Step 3: Drafting industry report (< 500 words)..."):
+        with st.spinner("Step 3: Drafting industry report (450 < 500 words)..."):
             full_context = "\n\n".join(text[:4000] for text in all_texts)
             
             # Formatted cleanly to avoid multiline syntax errors
@@ -183,7 +183,7 @@ if st.button("Generate Report"):
                 f"You are a Market Research Analyst.\n"
                 f"Write an industry report on '{industry}' based ONLY on the context below.\n\n"
                 f"STRUCTURE:\n- Executive Summary\n- Market Dynamics\n- Key Trends\n- Competitive Landscape\n- Future Outlook\n\n"
-                f"RULES:\n- Total word count MUST be strictly under 500 words.\n- Highly professional, data-driven tone.\n\n"
+                f"RULES:\n- Total word count MUST be strictly between 450 and 500 words.\n- Highly professional, data-driven tone.\n\n"
                 f"CONTEXT:\n{full_context}"
             )
 
@@ -191,7 +191,7 @@ if st.button("Generate Report"):
                 report_response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=report_prompt,
-                    config={"temperature": 0.4, "max_output_tokens": 3000}
+                    config={"temperature": 0.4, "max_output_tokens": 3500}
                 )
                 report_text = extract_text_from_response(report_response)
 
@@ -201,7 +201,7 @@ if st.button("Generate Report"):
 
                 # Cleanup and word count enforcement
                 report_text = re.sub(r"^(Here is|Certainly|Sure|As requested).*?:\n*", "", report_text, flags=re.IGNORECASE | re.DOTALL).strip()
-                report_text, status = enforce_word_limits(report_text, max_words=490)
+                report_text, status = enforce_word_limits(report_text, min_words=450, max_words=490)
                 final_count = word_count(report_text)
 
                 # Output
@@ -217,6 +217,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
