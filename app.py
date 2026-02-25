@@ -50,7 +50,7 @@ def is_valid_industry(client, user_input):
         return False
     
     try:
-        validation_prompt = f"Categorize the term '{text}' into one of two tags: [INDUSTRY] for real economic sectors Is this a recognized economic industry or market sector (e.g., "Renewable Energy", "SaaS", "Automotive")?, or [INVALID] for fictional characters, specific people, cities, or random objects. Return ONLY the tag."
+        validation_prompt = f"Categorize the term '{text}' into one of two tags: [INDUSTRY] for real economic sectors Is this a recognized economic industry or market sector (e.g., Renewable Energy, SaaS, Automotive)?, or [INVALID] for fictional characters, specific people, cities, or random objects. Return ONLY the tag."
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=validation_prompt,
@@ -217,5 +217,6 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
