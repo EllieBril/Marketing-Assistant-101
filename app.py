@@ -117,14 +117,13 @@ def enforce_word_limits(text, min_words=450, max_words=490): # I included both m
     return text, "ok"
 
 # Sidebar
-
 with st.sidebar:
     st.title("Configuration")
     st.header("Settings")
 
     st.selectbox("Select LLM", ["Gemini 2.5 Flash"])
 
-    # 1. Initialize safe memory blocks
+    # Initialize memory securely
     if "my_api_key_persistent" not in st.session_state:
         st.session_state.my_api_key_persistent = ""
     if "api_key_expiry" not in st.session_state:
@@ -132,33 +131,34 @@ with st.sidebar:
     if "api_key_saved" not in st.session_state:
         st.session_state.api_key_saved = False
 
-    # 2. Automatically wipe the key from memory if 30 minutes have passed
     current_time = time.time()
-    if st.session_state.api_key_saved and current_time > st.session_state.api_key_expiry:
-        st.session_state.my_api_key_persistent = ""
-        st.session_state.api_key_expiry = 0
-        st.session_state.api_key_saved = False
-        st.warning("API Key expired (30 min limit reached). Please re-enter it.")
+    if st.session_state.get("api_key_saved"):
+        if current_time > st.session_state.api_key_expiry:
+            st.session_state.my_api_key_persistent = ""
+            st.session_state.api_key_expiry = 0
+            st.session_state.api_key_saved = False
+            st.warning("API Key expired (30 min limit reached).")
 
-    # 3. Secure Password Input
+    default_key = st.session_state.get("my_api_key_persistent", "")
+    
+    # Ensure this KEY is unique
     api_key_input = st.text_input(
         "Enter your API Key", 
         type="password", 
-        value=st.session_state.my_api_key_persistent, 
-        key="api_input_field"
+        value=default_key, 
+        key="api_input_field_unique" 
     )
 
-    # 4. Save to temporary session memory
-    if st.button("Save API Key"):
+    if st.button("Save API Key", key="save_button_unique"):
         if api_key_input:
             st.session_state.my_api_key_persistent = api_key_input
-            st.session_state.api_key_expiry = time.time() + 1800  # 30 minutes from now
+            st.session_state.api_key_expiry = time.time() + 1800
             st.session_state.api_key_saved = True
-            st.success("API Key saved securely in memory for 30 minutes!")
+            st.success("API Key saved for 30 minutes!")
         else:
             st.error("Please enter a key before saving.")
 
-    if not st.session_state.api_key_saved:
+    if not st.session_state.get("api_key_saved"):
         st.warning("Please save your API key to begin.")
 
     if "my_api_key_persistent" not in st.session_state:
@@ -298,6 +298,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
