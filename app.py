@@ -177,9 +177,6 @@ with st.sidebar:
             st.warning("API Key expired (30 min limit reached).")
 
     default_key = st.session_state.get("my_api_key_persistent", "")
-    api_key_input = st.text_input(
-        "Enter your API Key", type="password", value=default_key, key="api_input_field"
-    )
 
     if st.button("Save API Key"):
         if api_key_input:
@@ -301,5 +298,6 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
