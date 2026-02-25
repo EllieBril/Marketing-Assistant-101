@@ -51,56 +51,42 @@ def extract_text_from_response(response):
 def is_valid_industry(client, user_input):
     text = user_input.strip()
 
-    # 1. Hard Python Logic (Fastest)
+    # 1. Immediate Rejection (Hard Logic)
     if len(text) < 3 or text.isdigit():
         return False
+    
+    # 2. Block obvious non-Latin or symbol-heavy junk
     if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-\/]+$', text):
         return False
 
-    # 2. Stage 1 — BLS fuzzy match
-    bls_industries = load_bls_industries()
-    if bls_industries:
-        close = get_close_matches(text.lower(), bls_industries, n=1, cutoff=0.7) # Higher cutoff
-        if close:
-            return True
-
-    # 3. Stage 2 — The "Hardened" LLM Gate
+    # 3. The "Contextual" LLM Check
+    # Instead of a YES/NO test, we ask the AI to categorize the term.
+    # If it can't find a business category, it returns 'INVALID'.
     try:
-        # We use Few-Shot examples to teach the AI where the line is
         validation_prompt = f"""
-        TASK: Determine if the input is a high-level business INDUSTRY or SECTOR.
+        Analyze the term: "{text}"
         
-        RULES:
-        - Must be a general category (e.g., 'SaaS', 'Retail', 'Fintech').
-        - REJECT specific products or items (e.g., 'Pizza', 'iPhone', 'Shoes').
-        - REJECT specific people or companies (e.g., 'Elon Musk', 'Tesla').
-        - REJECT fictional concepts or media (e.g., 'Harry Potter', 'Star Wars').
+        Categorize this into one of the following:
+        - [INDUSTRY]: Real economic sectors (e.g., Manufacturing, SaaS, Retail, Energy).
+        - [INVALID]: Fictional characters, specific people, cities, or random objects.
 
-        EXAMPLES:
-        Input: "E-commerce" -> YES
-        Input: "Pizza" -> NO (This is a food item, not an industry)
-        Input: "Batman" -> NO (This is a fictional character)
-        Input: "Renewable Energy" -> YES
-        Input: "London" -> NO (This is a location)
-        Input: "Dog walking" -> YES (This is a business niche)
-
-        INPUT TO EVALUATE: "{text}"
-        ANSWER ONLY 'YES' OR 'NO':
+        Return ONLY the category tag.
         """
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash", # Use 1.5-flash for speed and reliability in logic
+            model="gemini-1.5-flash",
             contents=validation_prompt,
-            config={"temperature": 0.0} # Zero temperature is mandatory for classification
+            config={"temperature": 0.1} # Slight temperature prevents the "frozen" NO
         )
         
-        verdict = extract_text_from_response(response).strip().upper()
+        verdict = extract_text_from_response(response).upper()
         
-        # Double check: sometimes AI gets chatty. We only want a clean YES.
-        return "YES" in verdict and "NO" not in verdict
+        # If the AI thinks it's an industry, we let it through.
+        return "[INDUSTRY]" in verdict
 
     except Exception:
-        return False # Safer to fail shut than fail open
+        # If the API hits a snag, fail 'open' so the user isn't blocked.
+        return True
 
 
 
@@ -322,6 +308,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
