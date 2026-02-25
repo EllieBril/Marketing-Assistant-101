@@ -39,15 +39,6 @@ def is_valid_industry(client, user_input):
     if not re.match(r'^[a-z\s\-]+$', user_input):
         return False
 
-    # --- LAYER 2: THE "NOT-AN-INDUSTRY" BLACKLIST ---
-    # Instantly block common non-business search types
-    blacklist = [
-        "movie", "book", "character", "song", "person", "celebrity", 
-        "city", "country", "hobby", "game", "recipe", "food"
-    ]
-    if any(word in user_input for word in blacklist):
-        return False
-
     # --- LAYER 3: LLM CLASSIFIER (The Gatekeeper) ---
     try:
         # We use a 'schema' approach here to force the AI to behave like a computer
@@ -281,6 +272,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
