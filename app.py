@@ -24,6 +24,15 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
             
     return urls, all_texts
+def extract_text_from_response(response):
+    """Safely extracts text from the Gemini response object."""
+    text_output = ""
+    if response and response.candidates:
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "text") and part.text:
+                text_output += part.text
+    return text_output.replace('\u0000', '').replace('\r', '').strip()
+    
 def is_valid_industry(client, user_input):
     # 1. Quick check: If it's just numbers, it's definitely not an industry
     if user_input.replace(" ", "").isdigit():
@@ -261,6 +270,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
