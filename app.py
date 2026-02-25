@@ -5,6 +5,7 @@ import wikipedia
 import time
 import json
 import os
+import re
 
 
 def get_wikipedia_urls(industry_query):
@@ -175,7 +176,7 @@ if st.button("Generate Report"):
                         with st.spinner("Drafting your industry report..."):
                           
                             full_context = "\n\n NEXT SOURCE\n\n".join(
-                                text[:1500] for text in all_texts
+                                text[:3000] for text in all_texts
                             )
                             
                             prompt = f"""
@@ -213,7 +214,7 @@ if st.button("Generate Report"):
                                 report_text = extract_text_from_response(current_response)
                                 
                                 # ITERATIVE REFINEMENT LOOP
-                                import re
+                        
                                 max_attempts = 1
                                 for attempt in range(max_attempts):
                                     # Strip common AI chat prefixes to get accurate word count
@@ -224,6 +225,7 @@ if st.button("Generate Report"):
                                     count = len(words)
                                     
                                     if 450 <= count <= 500:
+                                        report_text = clean_report
                                         break
                                     
                                     # Refine with original context and strict length instructions
@@ -231,7 +233,6 @@ if st.button("Generate Report"):
                                         refine_instruction = f"""
                                         STRICT INSTRUCTION: The report must be 450-500 words.
                                         CURRENT COUNT: {count} words.
-                                        OUTPUT FORMAT: Output ONLY the 5-section report. No intro text, no conversational filler.
                                         
                                         WIKIPEDIA DATA:
                                         {full_context}
@@ -270,6 +271,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
