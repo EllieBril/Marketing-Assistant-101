@@ -9,11 +9,9 @@ import re
 import requests
 from difflib import get_close_matches
 
-# ── Industry validation helpers ───────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False) # ton ensure that system correctly identifies industries, i uncluded link to the websites with list of industries as example.
+# I implemented it using Decorator feature. 
 def load_bls_industries():
-    """Fetch and cache the official BLS industry list once per session."""
     try:
         response = requests.get(
             "https://www.bls.gov/iag/tgs/iag_index_alpha.htm", timeout=10
@@ -22,24 +20,22 @@ def load_bls_industries():
         return [m.strip().lower() for m in matches if m.strip()]
     except Exception:
         return []
-
+# To ensure that user input is indeed relevant industry I included several guardrails to ensure no digits, no whitespaces, included, 
+# i reinforced it with AI prompt with detailed instructions. 
 def is_valid_industry(client, user_input):
-    """Two-stage validation: BLS fuzzy match, then LLM fallback."""
-    text = user_input.strip()
+    text = user_input.strip() 
 
     if len(text) < 3 or text.isdigit():
         return False
     if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-\/]+$', text):
         return False
 
-    # Stage 1 — BLS fuzzy match
     bls_industries = load_bls_industries()
     if bls_industries:
         close = get_close_matches(text.lower(), bls_industries, n=1, cutoff=0.6)
         if close:
             return True 
 
-    # Stage 2 — LLM fallback
     try:
         validation_prompt = f"""
         You are a strict classifier for a Market Research tool used by professional business analysts.
@@ -59,12 +55,12 @@ def is_valid_industry(client, user_input):
         - Vague or abstract concepts (e.g. "happiness", "nature", "love")
         - Food items or consumer products (e.g. "Pizza", "Coca-Cola")
 
-        Answer ONLY with YES or NO. No explanation.
+        Answer ONLY with YES or NO only.
         """
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=validation_prompt,
-            config={"temperature": 0.0}
+            config={"temperature": 0.0} # as end user for this assitant is professional market researcher, i reducded level of creativity ot 0.0 which means that system will return only factual information. 
         )
         verdict = extract_text_from_response(response).strip().upper()
         return verdict == "YES" 
@@ -72,10 +68,8 @@ def is_valid_industry(client, user_input):
     except Exception:
         return True 
 
-# ── Core helpers ──────────────────────────────────────────────────────────────
 
 def extract_text_from_response(response):
-    """Safely extract plain text from a Gemini response object."""
     text_output = ""
     if response and response.candidates:
         for part in response.candidates[0].content.parts:
@@ -84,7 +78,6 @@ def extract_text_from_response(response):
     return text_output.replace("\u0000", "").replace("\r", "").strip()
 
 def get_wikipedia_urls(industry_query):
-    """Return URLs and full text for the 5 most relevant Wikipedia pages."""
     search_results = wikipedia.search(industry_query, results=5)
     wiki_api = wikipediaapi.Wikipedia(
         user_agent="MarketResearchAssistant 101",
@@ -99,11 +92,9 @@ def get_wikipedia_urls(industry_query):
     return urls, all_texts
 
 def word_count(text):
-    """Return the number of words in a string."""
     return len(re.findall(r"\b\w+\b", text))
 
-def enforce_word_limits(text, min_words=450, max_words=490):
-    """Enforce a word count range on the report text."""
+def enforce_word_limits(text, min_words=450, max_words=490): # I included both minimum and maximum requirements for word count to ensure that report is elaborate enough. 
     matches = list(re.finditer(r"\b\w+\b", text))
     count = len(matches)
 
@@ -125,34 +116,50 @@ def enforce_word_limits(text, min_words=450, max_words=490):
 
     return text, "ok"
 
-# ── API key persistence ───────────────────────────────────────────────────────
-
-CACHE_FILE = ".gemini_api_key.json"
-
-def save_key_local(api_key, expiry):
-    try:
-        with open(CACHE_FILE, "w") as f:
-            json.dump({"api_key": api_key, "expiry": expiry}, f)
-    except Exception:
-        pass
-
-def load_key_local():
-    if os.path.exists(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r") as f:
-                data = json.load(f)
-                return data.get("api_key"), data.get("expiry")
-        except Exception:
-            pass
-    return None, None
-
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# Sidebar
 
 with st.sidebar:
     st.title("Configuration")
     st.header("Settings")
 
     st.selectbox("Select LLM", ["Gemini 2.5 Flash"])
+
+    # 1. Initialize safe memory blocks
+    if "my_api_key_persistent" not in st.session_state:
+        st.session_state.my_api_key_persistent = ""
+    if "api_key_expiry" not in st.session_state:
+        st.session_state.api_key_expiry = 0
+    if "api_key_saved" not in st.session_state:
+        st.session_state.api_key_saved = False
+
+    # 2. Automatically wipe the key from memory if 30 minutes have passed
+    current_time = time.time()
+    if st.session_state.api_key_saved and current_time > st.session_state.api_key_expiry:
+        st.session_state.my_api_key_persistent = ""
+        st.session_state.api_key_expiry = 0
+        st.session_state.api_key_saved = False
+        st.warning("API Key expired (30 min limit reached). Please re-enter it.")
+
+    # 3. Secure Password Input
+    api_key_input = st.text_input(
+        "Enter your API Key", 
+        type="password", 
+        value=st.session_state.my_api_key_persistent, 
+        key="api_input_field"
+    )
+
+    # 4. Save to temporary session memory
+    if st.button("Save API Key"):
+        if api_key_input:
+            st.session_state.my_api_key_persistent = api_key_input
+            st.session_state.api_key_expiry = time.time() + 1800  # 30 minutes from now
+            st.session_state.api_key_saved = True
+            st.success("API Key saved securely in memory for 30 minutes!")
+        else:
+            st.error("Please enter a key before saving.")
+
+    if not st.session_state.api_key_saved:
+        st.warning("Please save your API key to begin.")
 
     if "my_api_key_persistent" not in st.session_state:
         saved_key, saved_expiry = load_key_local()
@@ -190,14 +197,12 @@ with st.sidebar:
     if not st.session_state.get("api_key_saved"):
         st.warning("Please save your API key to begin.")
 
-# ── Gemini client ─────────────────────────────────────────────────────────────
-
+# Gemini client 
 client = None
 if st.session_state.get("api_key_saved"):
     client = genai.Client(api_key=st.session_state.my_api_key_persistent)
 
-# ── Main UI ───────────────────────────────────────────────────────────────────
-
+# Main section 
 st.title("Market Research Assistant 101")
 industry = st.text_input("Which industry are you researching today?", key="industry_input")
 
@@ -207,7 +212,7 @@ if st.button("Generate Report"):
     elif not client:
         st.error("Please provide your API key in the sidebar.")
     else:
-        # ── Step 1: Validate ────────────────
+        # Step 1: Validating industry
         with st.spinner("Validating industry..."):
             if not is_valid_industry(client, industry):
                 st.error(
@@ -217,7 +222,7 @@ if st.button("Generate Report"):
                 )
                 st.stop()
 
-        # ── Step 2: Wikipedia pages ──────────────
+        # Step 2: Wikipedia pages
         with st.spinner("Finding relevant Wikipedia sources..."):
             relevant_urls, all_texts = get_wikipedia_urls(industry)
 
@@ -230,12 +235,14 @@ if st.button("Generate Report"):
             st.write(f"{i}. {url}")
         st.divider()
 
-        # ── Step 3: Generate report ────────────
+        # Step 3: Generate report
         with st.spinner("Drafting your industry report..."):
 
-            full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
+            full_context = "\n\n NEXT SOURCE \n\n".join(
                 text[:6000] for text in all_texts
             )
+
+    #During the course of preparing this chat, I found that making system meet the word count by seperating instructions for text into sub sections work best. 
 
             sections = [
                 "EXECUTIVE SUMMARY",
@@ -254,7 +261,7 @@ if st.button("Generate Report"):
                     Write ONLY the "{section}" section of an industry report on: "{industry}".
 
                     STRICT RULES:
-                    - Write between 90 and 100 words. No more, no less.
+                    - Write between 90 and 100 words. 
                     - Start directly with the section heading: {section}
                     - Write in a professional, data-driven tone.
                     - Base your writing strictly on the Wikipedia context provided below.
@@ -274,18 +281,9 @@ if st.button("Generate Report"):
                     if not section_text.strip():
                         st.error(f"⚠️ Model returned empty response for section: {section}")
                         st.stop()
-
                     report_parts.append(section_text.strip())
-
                 # Combine all 5 sections
                 report_text = "\n\n".join(report_parts)
-
-                # Strip common AI filler prefixes
-                report_text = re.sub(
-                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
-                    "", report_text, flags=re.IGNORECASE | re.DOTALL
-                ).strip()
-
                 # Enforce word limits
                 report_text, status = enforce_word_limits(report_text, min_words=450, max_words=490)
                 final_count = word_count(report_text)
@@ -305,3 +303,4 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
