@@ -9,16 +9,11 @@ import re
 import requests
 from difflib import get_close_matches
 
-
 # ── Industry validation helpers ───────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False)
 def load_bls_industries():
-    """
-    Fetch and cache the official BLS industry list once per session.
-    Returns a list of lowercase industry name strings.
-    Falls back to an empty list if the request fails.
-    """
+    """Fetch and cache the official BLS industry list once per session."""
     try:
         response = requests.get(
             "https://www.bls.gov/iag/tgs/iag_index_alpha.htm", timeout=10
@@ -28,29 +23,11 @@ def load_bls_industries():
     except Exception:
         return []
 
-
 def is_valid_industry(client, user_input):
-    """
-    Two-stage validation:
-
-    Stage 1 — BLS fuzzy match (fast, no API call):
-        Check the user input against the official U.S. Bureau of Labor
-        Statistics industry list using fuzzy matching. A similarity cutoff
-        of 0.6 tolerates minor typos while rejecting unrelated words.
-
-    Stage 2 — LLM fallback (catches modern/niche industries not on BLS list):
-        If no BLS match is found, ask Gemini to classify the input.
-        This handles terms like "SaaS", "Cybersecurity", or "NFTs" that
-        are real industries but predate or fall outside the BLS taxonomy.
-
-    Returns True only if the input is confirmed as a real industry.
-    """
+    """Two-stage validation: BLS fuzzy match, then LLM fallback."""
     text = user_input.strip()
 
-    # Hard reject: too short, purely numeric, or non-Latin characters
-    if len(text) < 3:
-        return False
-    if text.isdigit():
+    if len(text) < 3 or text.isdigit():
         return False
     if not re.match(r'^[a-zA-Z0-9\s\&\,\.\-\/]+$', text):
         return False
@@ -60,23 +37,15 @@ def is_valid_industry(client, user_input):
     if bls_industries:
         close = get_close_matches(text.lower(), bls_industries, n=1, cutoff=0.6)
         if close:
-            return True  # Confirmed against official list — no LLM call needed
+            return True 
 
-    # Stage 2 — LLM fallback for modern/niche industries absent from BLS list
+    # Stage 2 — LLM fallback
     try:
         validation_prompt = f"""
         You are a strict classifier for a Market Research tool used by professional business analysts.
         Decide if the input below is a real, recognised business industry or economic sector.
 
         Input: "{text}"
-
-def extract_text_from_response(response):
-    text_output = ""
-    if response and response.candidates:
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, "text") and part.text:
-                text_output += part.text
-    return text_output.replace("\u0000", "").replace("\r", "").strip()
 
         Answer YES if it is a recognised industry, sector, market, or business niche.
         Examples of YES: "SaaS", "Renewable Energy", "Cybersecurity", "Fintech", "Pet Grooming", "NFTs"
@@ -85,26 +54,34 @@ def extract_text_from_response(response):
         - Fictional characters or franchises (e.g. "Batman", "Spiderman", "Star Wars")
         - People's names (e.g. "Elon Musk", "Taylor Swift")
         - Sentences or phrases (e.g. "I am hungry", "the weather is nice")
-        - Specific companies (e.g. "Apple Inc", "Tesla") — these are companies, not industries
-        - Standalone places (e.g. "London", "France") unless combined with an industry
+        - Specific companies (e.g. "Apple Inc", "Tesla")
+        - Standalone places (e.g. "London", "France")
         - Vague or abstract concepts (e.g. "happiness", "nature", "love")
         - Food items or consumer products (e.g. "Pizza", "Coca-Cola")
 
         Answer ONLY with YES or NO. No explanation.
         """
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=validation_prompt,
             config={"temperature": 0.0}
         )
         verdict = extract_text_from_response(response).strip().upper()
-        return verdict == "YES"  # strict equality — not just "YES" in verdict
+        return verdict == "YES" 
 
     except Exception:
-        return True  # Fail open so users aren't blocked by an API outage
-
+        return True 
 
 # ── Core helpers ──────────────────────────────────────────────────────────────
+
+def extract_text_from_response(response):
+    """Safely extract plain text from a Gemini response object."""
+    text_output = ""
+    if response and response.candidates:
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "text") and part.text:
+                text_output += part.text
+    return text_output.replace("\u0000", "").replace("\r", "").strip()
 
 def get_wikipedia_urls(industry_query):
     """Return URLs and full text for the 5 most relevant Wikipedia pages."""
@@ -125,15 +102,8 @@ def word_count(text):
     """Return the number of words in a string."""
     return len(re.findall(r"\b\w+\b", text))
 
-
-def enforce_word_limits(text, min_words=450, max_words=500):
-    """
-    Enforce a word count range on the report text.
-    - Over max_words : truncate to the last complete sentence within the limit.
-    - Under min_words: return as-is with status 'too_short'.
-    - Within range   : return as-is with status 'ok'.
-    Returns (processed_text, status) where status is 'ok', 'truncated', or 'too_short'.
-    """
+def enforce_word_limits(text, min_words=450, max_words=490):
+    """Enforce a word count range on the report text."""
     matches = list(re.finditer(r"\b\w+\b", text))
     count = len(matches)
 
@@ -155,11 +125,9 @@ def enforce_word_limits(text, min_words=450, max_words=500):
 
     return text, "ok"
 
-
 # ── API key persistence ───────────────────────────────────────────────────────
 
 CACHE_FILE = ".gemini_api_key.json"
-
 
 def save_key_local(api_key, expiry):
     try:
@@ -167,7 +135,6 @@ def save_key_local(api_key, expiry):
             json.dump({"api_key": api_key, "expiry": expiry}, f)
     except Exception:
         pass
-
 
 def load_key_local():
     if os.path.exists(CACHE_FILE):
@@ -178,7 +145,6 @@ def load_key_local():
         except Exception:
             pass
     return None, None
-
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
@@ -224,13 +190,11 @@ with st.sidebar:
     if not st.session_state.get("api_key_saved"):
         st.warning("Please save your API key to begin.")
 
-
 # ── Gemini client ─────────────────────────────────────────────────────────────
 
 client = None
 if st.session_state.get("api_key_saved"):
     client = genai.Client(api_key=st.session_state.my_api_key_persistent)
-
 
 # ── Main UI ───────────────────────────────────────────────────────────────────
 
@@ -243,7 +207,7 @@ if st.button("Generate Report"):
     elif not client:
         st.error("Please provide your API key in the sidebar.")
     else:
-        # ── Step 1: Validate that the input is a real industry ────────────────
+        # ── Step 1: Validate ────────────────
         with st.spinner("Validating industry..."):
             if not is_valid_industry(client, industry):
                 st.error(
@@ -253,7 +217,7 @@ if st.button("Generate Report"):
                 )
                 st.stop()
 
-        # ── Step 2: Retrieve the 5 most relevant Wikipedia pages ──────────────
+        # ── Step 2: Wikipedia pages ──────────────
         with st.spinner("Finding relevant Wikipedia sources..."):
             relevant_urls, all_texts = get_wikipedia_urls(industry)
 
@@ -266,83 +230,5 @@ if st.button("Generate Report"):
             st.write(f"{i}. {url}")
         st.divider()
 
-        # ── Step 3: Generate the industry report (under 500 words) ────────────
-        with st.spinner("Drafting your industry report..."):
-
-            full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
-                text[:6000] for text in all_texts
-            )
-
-            sections = [
-                "EXECUTIVE SUMMARY",
-                "MARKET DYNAMICS & SIZE",
-                "KEY TECHNOLOGICAL OR SOCIAL TRENDS",
-                "COMPETITIVE LANDSCAPE",
-                "FUTURE OUTLOOK & CHALLENGES"
-            ]
-
-            try:
-                report_parts = []
-
-                for section in sections:
-                    section_prompt = f"""
-                    You are a senior Market Research Analyst writing for a corporate leadership team.
-                    Write ONLY the "{section}" section of an industry report on: "{industry}".
-
-                    STRICT RULES:
-                    - Write between 90 and 100 words. No more, no less.
-                    - Start directly with the section heading: {section}
-                    - Write in a professional, data-driven tone.
-                    - Base your writing strictly on the Wikipedia context provided below.
-                    - Output ONLY the section text. No commentary, no word count.
-
-                    WIKIPEDIA CONTEXT:
-                    {full_context}
-                    """
-
-                    section_response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=section_prompt,
-                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 8000}
-                    )
-                    section_text = extract_text_from_response(section_response)
-
-                    if not section_text.strip():
-                        st.error(f"⚠️ Model returned empty response for section: {section}")
-                        st.stop()
-
-                    report_parts.append(section_text.strip())
-
-                # Combine all 5 sections
-                report_text = "\n\n".join(report_parts)
-
-                # Strip common AI filler prefixes
-                report_text = re.sub(
-                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
-                    "", report_text, flags=re.IGNORECASE | re.DOTALL
-                ).strip()
-
-                # Enforce word limits
-                report_text, status = enforce_word_limits(report_text)
-                final_count = word_count(report_text)
-
-                # Display report
-                st.subheader(f"{industry} Industry Report")
-                st.write(report_text)
-                st.divider()
-                st.info(f"📊 Final Word Count: {final_count} words")
-
-                if status == "too_short":
-                    st.warning(f"⚠️ Report is under 450 words ({final_count} words). Try regenerating.")
-                elif status == "truncated":
-                    st.info(f"✂️ Report was trimmed to {final_count} words.")
-                else:
-                    st.success("✅ Report meets the 450–500 word target.")
-
-            except Exception as e:
-                st.error(f"Error generating report: {e}")
-
-
-
-
-
+        # ── Step 3: Generate report ────────────
+        with st.spinner("
