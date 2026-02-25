@@ -7,7 +7,11 @@ import json
 import os
 import re
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
 def get_wikipedia_urls(industry_query):
+    """Return URLs and full text for the 5 most relevant Wikipedia pages."""
     search_results = wikipedia.search(industry_query, results=5)
     wiki_api = wikipediaapi.Wikipedia(
         user_agent="MarketResearchAssistant 101",
@@ -21,10 +25,6 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
-report_text = re.sub(
-    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
-    "", report_text, flags=re.IGNORECASE | re.DOTALL
-).strip()
 
 def extract_text_from_response(response):
     """Safely extract plain text from a Gemini response object."""
@@ -34,6 +34,7 @@ def extract_text_from_response(response):
             if hasattr(part, "text") and part.text:
                 text_output += part.text
     return text_output.replace("\u0000", "").replace("\r", "").strip()
+
 
 def is_valid_industry(client, user_input):
     """Return True if the input looks like a real industry name in English."""
@@ -67,23 +68,27 @@ def is_valid_industry(client, user_input):
         return True  # Don't block the user if the API fails
 
 
+def word_count(text):
+    """Return the number of words in a string."""
+    return len(re.findall(r"\b\w+\b", text))
+
+
 def enforce_word_limits(text, min_words=450, max_words=500):
     """
     Enforce a word count range on the report text.
-    - If over max_words: truncate to the last complete sentence within the limit.
-    - If under min_words: flag it — text cannot be expanded programmatically.
-    - Returns a tuple: (processed_text, status)
-      status is one of: 'ok', 'truncated', 'too_short'
+    - Over max_words : truncate to the last complete sentence within the limit.
+    - Under min_words: return as-is with status 'too_short'.
+    - Within range   : return as-is with status 'ok'.
+    Returns a tuple (processed_text, status) where status is
+    one of: 'ok', 'truncated', 'too_short'.
     """
     matches = list(re.finditer(r"\b\w+\b", text))
     count = len(matches)
 
-    # Over the upper limit — truncate
     if count > max_words:
         cutoff_pos = matches[max_words - 1].end()
         truncated = text[:cutoff_pos].rstrip()
 
-        # Walk back to last complete sentence
         if not truncated.endswith((".", "!", "?")):
             last_end = max(
                 truncated.rfind("."),
@@ -95,35 +100,16 @@ def enforce_word_limits(text, min_words=450, max_words=500):
 
         return truncated, "truncated"
 
-    # Under the lower limit — cannot expand programmatically
     if count < min_words:
         return text, "too_short"
 
-    # Within range
     return text, "ok"
 
 
-def word_count(text):
-    return len(re.findall(r"\b\w+\b", text))
-# Apply word limit enforcement
-report_text, status = enforce_word_limits(report_text)
-final_count = word_count(report_text)
-
-# Display
-st.subheader(f"{industry} Industry Report")
-st.write(report_text)
-st.divider()
-st.info(f"📊 Final Word Count: {final_count} words")
-
-if status == "too_short":
-    st.warning(f"⚠️ Report is under 450 words ({final_count} words). Try regenerating.")
-elif status == "truncated":
-    st.info(f"✂️ Report was trimmed from over 500 words to {final_count} words.")
-else:
-    st.success("✅ Report meets the 450–500 word target.")
-
+# ── API key persistence ───────────────────────────────────────────────────────
 
 CACHE_FILE = ".gemini_api_key.json"
+
 
 def save_key_local(api_key, expiry):
     try:
@@ -131,6 +117,7 @@ def save_key_local(api_key, expiry):
             json.dump({"api_key": api_key, "expiry": expiry}, f)
     except Exception:
         pass
+
 
 def load_key_local():
     if os.path.exists(CACHE_FILE):
@@ -225,122 +212,77 @@ if st.button("Generate Report"):
             st.write(f"{i}. {url}")
         st.divider()
 
-        # Step 3 — Generate report
+        # Step 3 — Generate report section by section
         with st.spinner("Drafting your industry report..."):
 
             full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
                 text[:6000] for text in all_texts
             )
 
-            prompt = f"""
-            You are a senior Market Research Analyst writing for corporate leadership.
-            Write a professional industry report on: "{industry}".
-
-            YOUR ONLY JOB: Produce EXACTLY 450-500 words. Count carefully. Do not stop early.
-
-            MANDATORY STRUCTURE (each section must be 80-100 words):
-            1. EXECUTIVE SUMMARY
-            2. MARKET DYNAMICS & SIZE
-            3. KEY TECHNOLOGICAL OR SOCIAL TRENDS
-            4. COMPETITIVE LANDSCAPE
-            5. FUTURE OUTLOOK & CHALLENGES
-
-            Output ONLY the report. No preamble, no word count declaration, no commentary.
-
-            WIKIPEDIA CONTEXT:
-            {full_context}
-            """
+            sections = [
+                "EXECUTIVE SUMMARY",
+                "MARKET DYNAMICS & SIZE",
+                "KEY TECHNOLOGICAL OR SOCIAL TRENDS",
+                "COMPETITIVE LANDSCAPE",
+                "FUTURE OUTLOOK & CHALLENGES"
+            ]
 
             try:
-                # Initial generation
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
-                )
-                report_text = extract_text_from_response(response)
+                report_parts = []
 
-                if not report_text.strip():
-                    st.error("⚠️ The model returned an empty response. Check your API key or try again.")
-                    st.stop()
-        
+                for section in sections:
+                    section_prompt = f"""
+                    You are a senior Market Research Analyst.
+                    Write ONLY the "{section}" section of an industry report on: "{industry}".
 
-                # Iterative refinement loop
-                max_attempts = 3
-                for attempt in range(max_attempts):
-                    count = word_count(report_text)
+                    STRICT RULES:
+                    - Write between 90 and 100 words. No more, no less.
+                    - Start directly with the section heading: {section}
+                    - Write in a professional, data-driven tone.
+                    - Output ONLY the section text. No commentary, no word count.
 
-                    if 450 <= count <= 500:
-                        break
+                    WIKIPEDIA CONTEXT:
+                    {full_context}
+                    """
 
-                    if count < 450:
-                        refine_instruction = f"""
-                        This report is {count} words — too short.
-                        Expand it to reach exactly 450-500 words.
-                        Add more detail to existing sections. Do NOT add new sections.
-                        Output ONLY the expanded report, no commentary.
-
-                        REPORT TO EXPAND:
-                        {report_text}
-                        """
-                    else:
-                        refine_instruction = f"""
-                        This report is {count} words — too long.
-                        Trim it to exactly 450-500 words.
-                        Output ONLY the trimmed report, no commentary.
-
-                        REPORT TO TRIM:
-                        {report_text}
-                        """
-
-                    refine_response = client.models.generate_content(
+                    section_response = client.models.generate_content(
                         model="gemini-2.5-flash",
-                        contents=refine_instruction,
-                        config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
+                        contents=section_prompt,
+                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 500}
                     )
-                    refined = extract_text_from_response(refine_response)
-                    if refined.strip():
-                        report_text = refined
+                    section_text = extract_text_from_response(section_response)
 
-                # Hard truncation safety net — guarantees ≤ 500 words
-                report_text = truncate_to_500(report_text)
+                    if not section_text.strip():
+                        st.error(f"⚠️ Model returned empty response for section: {section}")
+                        st.stop()
+
+                    report_parts.append(section_text.strip())
+
+                # Join all 5 sections into one report
+                report_text = "\n\n".join(report_parts)
+
+                # Strip common AI filler prefixes
+                report_text = re.sub(
+                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
+                    "", report_text, flags=re.IGNORECASE | re.DOTALL
+                ).strip()
+
+                # Enforce word limits
+                report_text, status = enforce_word_limits(report_text)
                 final_count = word_count(report_text)
 
-                # Display
+                # Display report
                 st.subheader(f"{industry} Industry Report")
                 st.write(report_text)
                 st.divider()
                 st.info(f"📊 Final Word Count: {final_count} words")
 
-                if final_count < 450:
-                    st.warning("⚠️ Report is under 450 words. Consider increasing refinement attempts.")
-                elif final_count > 500:
-                    st.warning("⚠️ Report could not be trimmed within range.")
+                if status == "too_short":
+                    st.warning(f"⚠️ Report is under 450 words ({final_count} words). Try regenerating.")
+                elif status == "truncated":
+                    st.info(f"✂️ Report was trimmed to {final_count} words.")
                 else:
                     st.success("✅ Report meets the 450–500 word target.")
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
