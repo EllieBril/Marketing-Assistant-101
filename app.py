@@ -222,8 +222,6 @@ if st.button("Generate Report"):
     else:
         st.success(f"✅ Report meets the 450–500 word target.")
 
-except Exception as e:
-    st.error(f"Error generating report: {e}")
 
 
 
