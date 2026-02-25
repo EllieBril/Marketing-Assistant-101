@@ -209,13 +209,13 @@ if st.button("Generate Report"):
                                 current_response = client.models.generate_content(
                                     model="gemini-2.5-flash",
                                     contents=prompt,
-                                    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 1500}
+                                    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
                                 )
                                 report_text = extract_text_from_response(current_response)
                                 
                                 # ITERATIVE REFINEMENT LOOP
                         
-                                max_attempts = 1
+                                max_attempts = 3
                                 for attempt in range(max_attempts):
                                     # Strip common AI chat prefixes to get accurate word count
                                     clean_report = re.sub(r'^(Here is|Certainly|Sure|As requested).*?:\n*', '', report_text, flags=re.IGNORECASE | re.DOTALL).strip()
@@ -254,7 +254,12 @@ if st.button("Generate Report"):
                                         {report_text}
                                         """
                                     
-                                    refine_response =  extract_text_from_response(current_response)
+                                    refine_response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=refine_instruction,
+    config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
+)
+report_text = extract_text_from_response(refine_response)
                                    
 
                                 # FINAL DISPLAY
@@ -271,6 +276,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
