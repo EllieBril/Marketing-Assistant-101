@@ -81,6 +81,17 @@ def enforce_word_limits(text, min_words=450, max_words=490):
         return text, "too_short"
     return text, "ok"
 
+extend_response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=extend_prompt,
+                        config={"temperature": 0.6, "max_output_tokens": 800} # Higher temp for more variety
+                    )
+                    extension_text = extract_text_from_response(extend_response)
+                    extension_text = re.sub(r"^(Here is|Certainly|Sure|As requested).*?:\n*", "", extension_text, flags=re.IGNORECASE | re.DOTALL).strip()
+                    
+                    # Append the new text to our running draft
+                    report_text += "\n\n" + extension_text
+
 # ── API key persistence ───────────────────────────────────────────────────────
 
 CACHE_FILE = ".gemini_api_key.json"
@@ -224,6 +235,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
