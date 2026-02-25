@@ -236,22 +236,22 @@ if st.button("Generate Report"):
                 report_parts = []
 
                 for section in sections:
-                    section_prompt = f"""
-                    You are a senior Market Research Analyst. Write ONLY the "{section}" section of an industry report on: "{industry}".
+                    section_prompt = f"""You are a senior Market Research Analyst.
+Write ONLY the "{section}" section of an industry report on: "{industry}".
 
-                    STRICT RULES:
-                    - Write between 90 and 100 words. No more, no less.
-                    - Start directly with the section heading: {section}
-                    - Write in a professional, data-driven tone.
-                    - Output ONLY the section text. No commentary, no word count.
+STRICT RULES:
+- Write between 90 and 100 words. No more, no less.
+- Start directly with the section heading: {section}
+- Write in a professional, data-driven tone.
+- Output ONLY the section text. No commentary, no word count.
 
-                    WIKIPEDIA CONTEXT:
-                    {full_context}
-                    """
+WIKIPEDIA CONTEXT:
+{full_context}"""
+
                     section_response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=section_prompt,
-                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 8000}
+                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 1024}
                     )
                     section_text = extract_text_from_response(section_response)
 
@@ -288,6 +288,7 @@ if st.button("Generate Report"):
             except Exception as e:
                 st.error(f"Error generating report: {e}")
                 """
+
 
 
 
