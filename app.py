@@ -89,8 +89,8 @@ extend_response = client.models.generate_content(
 extension_text = extract_text_from_response(extend_response)
 extension_text = re.sub(r"^(Here is|Certainly|Sure|As requested).*?:\n*", "", extension_text, flags=re.IGNORECASE | re.DOTALL).strip()
                     
-                    # Append the new text to our running draft
-                    report_text += "\n\n" + extension_text
+# Append the new text to our running draft
+report_text += "\n\n" + extension_text
 
 # ── API key persistence ───────────────────────────────────────────────────────
 
@@ -235,6 +235,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
