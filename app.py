@@ -21,6 +21,11 @@ def get_wikipedia_urls(industry_query):
             all_texts.append(page.text)
     return urls, all_texts
 
+ report_text = re.sub(
+                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
+                    "", report_text, flags=re.IGNORECASE | re.DOTALL
+                ).strip()
+
 def extract_text_from_response(response):
     """Safely extract plain text from a Gemini response object."""
     text_output = ""
@@ -258,12 +263,7 @@ if st.button("Generate Report"):
                 if not report_text.strip():
                     st.error("⚠️ The model returned an empty response. Check your API key or try again.")
                     st.stop()
-
-                # Strip common AI filler prefixes
-                report_text = re.sub(
-                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
-                    "", report_text, flags=re.IGNORECASE | re.DOTALL
-                ).strip()
+        
 
                 # Iterative refinement loop
                 max_attempts = 3
@@ -321,6 +321,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
