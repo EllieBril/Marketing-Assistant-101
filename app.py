@@ -67,8 +67,10 @@ def word_count(text):
 def enforce_word_limits(text, min_words=450, max_words=490):
     """Ensure text stays under the 500-word limit by truncating at the last sentence."""
     matches = list(re.finditer(r"\b\w+\b", text))
+    count = len(matches)
+    
    
-    if len(matches) > max_words:
+    if count > max_words:
         cutoff_pos = matches[max_words - 1].end()
         truncated = text[:cutoff_pos].rstrip()
         last_end = max(truncated.rfind("."), truncated.rfind("!"), truncated.rfind("?"))
@@ -222,6 +224,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
