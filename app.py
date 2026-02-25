@@ -70,7 +70,7 @@ def is_valid_industry(client, user_input):
 
         Input: "{text}"
 
-        def extract_text_from_response(response):
+def extract_text_from_response(response):
     text_output = ""
     if response and response.candidates:
         for part in response.candidates[0].content.parts:
@@ -341,6 +341,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
