@@ -231,4 +231,77 @@ if st.button("Generate Report"):
         st.divider()
 
         # ── Step 3: Generate report ────────────
-        with st.spinner("
+        with st.spinner("Drafting your industry report..."):
+
+            full_context = "\n\n--- NEXT SOURCE ---\n\n".join(
+                text[:6000] for text in all_texts
+            )
+
+            sections = [
+                "EXECUTIVE SUMMARY",
+                "MARKET DYNAMICS & SIZE",
+                "KEY TECHNOLOGICAL OR SOCIAL TRENDS",
+                "COMPETITIVE LANDSCAPE",
+                "FUTURE OUTLOOK & CHALLENGES"
+            ]
+
+            try:
+                report_parts = []
+
+                for section in sections:
+                    section_prompt = f"""
+                    You are a senior Market Research Analyst writing for a corporate leadership team.
+                    Write ONLY the "{section}" section of an industry report on: "{industry}".
+
+                    STRICT RULES:
+                    - Write between 90 and 100 words. No more, no less.
+                    - Start directly with the section heading: {section}
+                    - Write in a professional, data-driven tone.
+                    - Base your writing strictly on the Wikipedia context provided below.
+                    - Output ONLY the section text. No commentary, no word count.
+
+                    WIKIPEDIA CONTEXT:
+                    {full_context}
+                    """
+
+                    section_response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=section_prompt,
+                        config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 8000}
+                    )
+                    section_text = extract_text_from_response(section_response)
+
+                    if not section_text.strip():
+                        st.error(f"⚠️ Model returned empty response for section: {section}")
+                        st.stop()
+
+                    report_parts.append(section_text.strip())
+
+                # Combine all 5 sections
+                report_text = "\n\n".join(report_parts)
+
+                # Strip common AI filler prefixes
+                report_text = re.sub(
+                    r"^(Here is|Certainly|Sure|As requested).*?:\n*",
+                    "", report_text, flags=re.IGNORECASE | re.DOTALL
+                ).strip()
+
+                # Enforce word limits
+                report_text, status = enforce_word_limits(report_text, min_words=450, max_words=490)
+                final_count = word_count(report_text)
+
+                # Display report
+                st.subheader(f"{industry} Industry Report")
+                st.write(report_text)
+                st.divider()
+                st.info(f"📊 Final Word Count: {final_count} words")
+
+                if status == "too_short":
+                    st.warning(f"⚠️ Report is under 450 words ({final_count} words). Try regenerating.")
+                elif status == "truncated":
+                    st.info(f"✂️ Report was trimmed to {final_count} words.")
+                else:
+                    st.success("✅ Report meets the 450–500 word target.")
+
+            except Exception as e:
+                st.error(f"Error generating report: {e}")
