@@ -168,7 +168,7 @@ if st.button("Generate Report"):
                             HARD WORD COUNT LIMITS:
                             - Minimum: 450 words
                             - Maximum: 500 words
-                            Your target is exactly ~475 words to stay safely within the range.
+                            
                             
                             REPORT STRUCTURE & TARGETS:
                             1. EXECUTIVE SUMMARY
@@ -196,7 +196,7 @@ if st.button("Generate Report"):
                                 
                                 # ITERATIVE REFINEMENT LOOP
                                 import re
-                                max_attempts = 3
+                                max_attempts = 1
                                 for attempt in range(max_attempts):
                                     # Strip common AI chat prefixes to get accurate word count
                                     clean_report = re.sub(r'^(Here is|Certainly|Sure|As requested).*?:\n*', '', report_text, flags=re.IGNORECASE | re.DOTALL).strip()
@@ -256,6 +256,7 @@ if st.button("Generate Report"):
                                     
                             except Exception as e:
                                 st.error(f"Error generating report: {e}")
+
 
 
 
