@@ -246,9 +246,7 @@ if st.button("Generate Report"):
                     - Output ONLY the section text. No commentary, no word count.
 
                     WIKIPEDIA CONTEXT:
-                    {full_context}
-                    """
-
+                    {full_context}"""
                     section_response = client.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=section_prompt,
@@ -288,6 +286,7 @@ if st.button("Generate Report"):
 
             except Exception as e:
                 st.error(f"Error generating report: {e}")
+
 
 
 
