@@ -187,40 +187,90 @@ if st.button("Generate Report"):
                             
                             Please write the report now, ensuring it is thorough, professional, and meets the 450-500 word target.
                             """
-                           
 
-    # FINAL DISPLAY
+
+    report_text = extract_text_from_response(current_response)
+
+# Guard: stop early if nothing was returned
+if not report_text or not report_text.strip():
+    st.error("⚠️ The model returned an empty response. Check your API key or try again.")
+    st.stop()                       
+
+# ITERATIVE REFINEMENT LOOP
+max_attempts = 3
+for attempt in range(max_attempts):
+    clean_report = re.sub(r'^(Here is|Certainly|Sure|As requested).*?:\n*', '', report_text, flags=re.IGNORECASE | re.DOTALL).strip()
+    report_text = clean_report if clean_report else report_text  # don't overwrite with empty
+
     words = re.findall(r'\b\w+\b', report_text)
-    final_count = len(words)
+    count = len(words)
 
-    # Hard truncate if over 500 words
-    if final_count > 500:
-        word_matches = list(re.finditer(r'\b\w+\b', report_text))
-        cutoff_pos = word_matches[499].end()
-        report_text = report_text[:cutoff_pos].rstrip()
+    if 450 <= count <= 500:
+        break
 
-        if not report_text.endswith(('.', '!', '?')):
-            last_sentence_end = max(
-                report_text.rfind('.'),
-                report_text.rfind('!'),
-                report_text.rfind('?')
-            )
-            if last_sentence_end != -1:
-                report_text = report_text[:last_sentence_end + 1]
+    if count < 450:
+        refine_instruction = f"""
+        The following report is {count} words. Expand it to 450-500 words.
+        Add detail to existing sections. No new sections. No commentary.
+        Output ONLY the report.
 
-        final_count = len(re.findall(r'\b\w+\b', report_text))
-
-    st.subheader(f"{industry} Industry Report")
-    st.write(report_text)
-    st.divider()
-    st.info(f"📊 Final Word Count: {final_count} words")
-
-    if final_count < 450:
-        st.warning("⚠️ Report is under 450 words. Consider increasing context or refinement attempts.")
-    elif final_count > 500:
-        st.warning("⚠️ Report could not be trimmed within range.")
+        REPORT TO EXPAND:
+        {report_text}
+        """
     else:
-        st.success(f"✅ Report meets the 450–500 word target.")
+        refine_instruction = f"""
+        The following report is {count} words. Trim it to 450-500 words.
+        No commentary. Output ONLY the trimmed report.
+
+        REPORT TO TRIM:
+        {report_text}
+        """
+
+    refine_response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=refine_instruction,
+        config={"temperature": 0.5, "top_p": 0.95, "max_output_tokens": 3000}
+    )
+    refined = extract_text_from_response(refine_response)
+    if refined and refined.strip():  # only update if we got something back
+        report_text = refined
+
+# FINAL DISPLAY
+if not report_text or not report_text.strip():
+    st.error("⚠️ No report could be generated. Please try again.")
+    st.stop()
+
+words = re.findall(r'\b\w+\b', report_text)
+final_count = len(words)
+
+if final_count > 500:
+    word_matches = list(re.finditer(r'\b\w+\b', report_text))
+    cutoff_pos = word_matches[499].end()
+    report_text = report_text[:cutoff_pos].rstrip()
+
+    if not report_text.endswith(('.', '!', '?')):
+        last_sentence_end = max(
+            report_text.rfind('.'),
+            report_text.rfind('!'),
+            report_text.rfind('?')
+        )
+        if last_sentence_end != -1:
+            report_text = report_text[:last_sentence_end + 1]
+
+    final_count = len(re.findall(r'\b\w+\b', report_text))
+
+st.subheader(f"{industry} Industry Report")
+st.write(report_text)
+st.divider()
+st.info(f"📊 Final Word Count: {final_count} words")
+
+if final_count < 450:
+    st.warning("⚠️ Report is under 450 words. Consider increasing context or refinement attempts.")
+elif final_count > 500:
+    st.warning("⚠️ Report could not be trimmed within range.")
+else:
+    st.success(f"✅ Report meets the 450–500 word target.")
+
 
 
 
